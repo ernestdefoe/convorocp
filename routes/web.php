@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ContainerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
@@ -93,6 +94,11 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}', [CustomerController::class, 'show'])->name('customers.show');
+
+    Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');
+    Route::post('/containers', [ContainerController::class, 'store'])->name('containers.store');
+    Route::post('/containers/{container}/{action}', [ContainerController::class, 'action'])->name('containers.action');
+    Route::delete('/containers/{container}', [ContainerController::class, 'destroy'])->name('containers.destroy');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');
     Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');

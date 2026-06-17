@@ -24,6 +24,7 @@ class Agent
         'dns.zone.read', 'dns.zone.write', 'dns.reload',
         'cron.write', 'cron.delete', 'cron.run_now',
         'daemon.create', 'daemon.delete', 'daemon.start', 'daemon.stop', 'daemon.restart',
+        'container.run', 'container.start', 'container.stop', 'container.remove',
     ];
 
     public static function dispatch(string $op, array $args): AgentOperation

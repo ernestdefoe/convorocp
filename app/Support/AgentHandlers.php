@@ -27,6 +27,10 @@ class AgentHandlers
         'db.create' => 'dbCreate',
         'db.user.create' => 'dbUserCreate',
         'db.drop' => 'dbDrop',
+        'container.run' => 'containerRun',
+        'container.start' => 'containerStart',
+        'container.stop' => 'containerStop',
+        'container.remove' => 'containerRemove',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -356,6 +360,84 @@ class AgentHandlers
         return $v;
     }
 
+    // ---- Docker containers ----------------------------------------------
+
+    private static function containerRun(array $args): array
+    {
+        $name = self::ident($args['name'] ?? '');
+        $image = (string) ($args['image'] ?? '');
+        if (! preg_match('#^[a-z0-9][a-z0-9._/-]*(:[a-z0-9._-]+)?$#i', $image)) {
+            throw new \RuntimeException('Invalid image reference.');
+        }
+        $cport = max(1, (int) ($args['container_port'] ?? 80));
+        $hport = max(1, (int) ($args['host_port'] ?? 0));
+        $restart = in_array(($args['restart'] ?? ''), ['no', 'always', 'on-failure', 'unless-stopped'], true) ? $args['restart'] : 'unless-stopped';
+        $cn = "cp-{$name}";
+
+        self::run(['docker', 'rm', '-f', $cn]); // replace if it exists
+        $r = self::run(['docker', 'run', '-d', '--name', $cn, '--restart', $restart,
+            '-p', "127.0.0.1:{$hport}:{$cport}", $image], 300);
+        if (! $r->successful()) {
+            throw new \RuntimeException('docker run failed: '.trim($r->errorOutput()));
+        }
+
+        $domain = (string) ($args['domain'] ?? '');
+        if ($domain !== '') {
+            self::domain(['domain' => $domain]);
+            self::writeProxyVhost($domain, $hport);
+        }
+
+        return ['applied' => true, 'name' => $name, 'image' => $image, 'host_port' => $hport];
+    }
+
+    private static function containerStart(array $args): array
+    {
+        self::run(['docker', 'start', 'cp-'.self::ident($args['name'] ?? '')]);
+
+        return ['applied' => true];
+    }
+
+    private static function containerStop(array $args): array
+    {
+        self::run(['docker', 'stop', 'cp-'.self::ident($args['name'] ?? '')]);
+
+        return ['applied' => true];
+    }
+
+    private static function containerRemove(array $args): array
+    {
+        $name = self::ident($args['name'] ?? '');
+        self::run(['docker', 'rm', '-f', "cp-{$name}"]);
+        $domain = (string) ($args['domain'] ?? '');
+        if ($domain !== '' && preg_match('/^[a-z0-9.-]+$/i', $domain)) {
+            @unlink("/etc/nginx/sites-enabled/{$domain}");
+            @unlink("/etc/nginx/sites-available/{$domain}");
+            self::run(['systemctl', 'reload', 'nginx']);
+        }
+
+        return ['applied' => true, 'removed' => true];
+    }
+
+    private static function writeProxyVhost(string $domain, int $hport): void
+    {
+        $conf = "server {\n    listen 80;\n    server_name {$domain} www.{$domain};\n"
+            ."    location / {\n        proxy_pass http://127.0.0.1:{$hport};\n"
+            ."        proxy_set_header Host \$host;\n        proxy_set_header X-Real-IP \$remote_addr;\n"
+            ."        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto \$scheme;\n    }\n}\n";
+        $vhost = "/etc/nginx/sites-available/{$domain}";
+        file_put_contents($vhost, $conf);
+        if (! file_exists("/etc/nginx/sites-enabled/{$domain}")) {
+            symlink($vhost, "/etc/nginx/sites-enabled/{$domain}");
+        }
+        $test = self::run(['nginx', '-t']);
+        if (! $test->successful()) {
+            @unlink("/etc/nginx/sites-enabled/{$domain}");
+            @unlink($vhost);
+            throw new \RuntimeException('proxy vhost invalid: '.trim($test->errorOutput()));
+        }
+        self::run(['systemctl', 'reload', 'nginx']);
+    }
+
     // ---- Templates / helpers --------------------------------------------
 
     private static function domain(array $args): string
@@ -435,6 +517,7 @@ class AgentHandlers
             str_starts_with($op, 'dns.') => "write + reload the zone for {$d}",
             str_starts_with($op, 'cron.') => "write systemd timer for task {$d}",
             str_starts_with($op, 'daemon.') => "write/control systemd unit for daemon {$d}",
+            str_starts_with($op, 'container.') => substr($op, 10)." docker container ".($args['name'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
             $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
             default => "apply {$op}",
