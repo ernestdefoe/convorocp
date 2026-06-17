@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
-const props = defineProps({ site: Object, path: String, parent: { type: String, default: null }, entries: { type: Array, default: null }, file: { type: Object, default: null } });
+const props = defineProps({ site: Object, path: String, parent: { type: String, default: null }, entries: { type: Array, default: null }, file: { type: Object, default: null }, provisioned: { type: Boolean, default: true } });
 
 const url = (p) => `/sites/${props.site.id}/files?path=${encodeURIComponent(p)}`;
 const human = (n) => (n == null ? '' : n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
@@ -28,13 +28,18 @@ const del = (p, name) => { if (confirm(`Delete ${name}?`)) router.delete(`/sites
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
             <Link :href="`/sites/${site.id}`" style="font-size: 12.5px; color: var(--cp-mut); text-decoration: none; display: inline-flex; align-items: center; gap: 4px"><i class="ti ti-chevron-left" style="font-size: 15px" aria-hidden="true"></i>Site</Link>
             <div style="flex: 1; font-family: ui-monospace, monospace; font-size: 12.5px; color: var(--cp-mut)">/{{ path }}</div>
-            <template v-if="entries">
+            <template v-if="entries && provisioned">
                 <label style="font-size: 12px; color: var(--cp-mut); cursor: pointer; display: inline-flex; align-items: center; gap: 5px"><i class="ti ti-upload" style="font-size: 15px" aria-hidden="true"></i>Upload<input type="file" @change="doUpload" style="display: none"></label>
                 <button type="button" @click="newFolder" style="font-size: 12px; color: var(--cp-mut); background: transparent; border: 1px solid var(--cp-ln); border-radius: 8px; padding: 6px 11px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 5px"><i class="ti ti-folder-plus" style="font-size: 15px" aria-hidden="true"></i>New folder</button>
             </template>
         </div>
 
-        <div v-if="entries" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; overflow: hidden">
+        <div v-if="!provisioned" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 40px; text-align: center; color: var(--cp-dim); font-size: 13px">
+            <i class="ti ti-folder-off" style="font-size: 26px; display: block; margin-bottom: 10px" aria-hidden="true"></i>
+            This site isn't provisioned on this node yet — files appear once it's deployed.
+        </div>
+
+        <div v-else-if="entries" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; overflow: hidden">
             <Link v-if="parent !== null" :href="url(parent)" style="display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-bottom: 1px solid var(--cp-ln); text-decoration: none; color: var(--cp-mut); font-size: 13px">
                 <i class="ti ti-arrow-up" style="font-size: 16px" aria-hidden="true"></i>..
             </Link>

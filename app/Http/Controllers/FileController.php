@@ -48,11 +48,19 @@ class FileController extends Controller
     public function index(Request $request, Site $site)
     {
         $this->authorizeSite($request, $site);
-        $base = $this->base($site);
+
+        $base = realpath("/var/www/sites/{$site->domain}");
+        if ($base === false) {
+            return Inertia::render('Files/Index', [
+                'site' => ['id' => $site->id, 'domain' => $site->domain],
+                'path' => '', 'parent' => null, 'entries' => [], 'file' => null, 'provisioned' => false,
+            ]);
+        }
+
         $rel = (string) $request->query('path', '');
         $real = $this->safe($base, $rel);
 
-        $common = ['site' => ['id' => $site->id, 'domain' => $site->domain], 'path' => trim($rel, '/'), 'parent' => $this->parent($rel)];
+        $common = ['site' => ['id' => $site->id, 'domain' => $site->domain], 'path' => trim($rel, '/'), 'parent' => $this->parent($rel), 'provisioned' => true];
 
         if (is_file($real)) {
             $size = filesize($real);
