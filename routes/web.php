@@ -4,7 +4,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
+use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SchedulerController;
+use App\Http\Controllers\SignupController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +15,8 @@ use Inertia\Inertia;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/signup', [SignupController::class, 'show'])->name('signup');
+    Route::post('/signup', [SignupController::class, 'store']);
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
@@ -72,4 +76,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/daemons', [DaemonController::class, 'store'])->name('daemons.store');
     Route::post('/daemons/{daemon}/{action}', [DaemonController::class, 'action'])->name('daemons.action');
     Route::delete('/daemons/{daemon}', [DaemonController::class, 'destroy'])->name('daemons.destroy');
+
+    Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
+    Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');
+    Route::patch('/plans/{plan}', [PlanController::class, 'update'])->name('plans.update');
+    Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
 });

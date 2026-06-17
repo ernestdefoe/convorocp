@@ -15,6 +15,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $plans = collect([
+            ['name' => 'Starter', 'slug' => 'starter', 'price_cents' => 1200, 'sites_limit' => 1, 'db_limit' => 1, 'email_limit' => 5, 'disk_mb' => 5120, 'position' => 1],
+            ['name' => 'Pro', 'slug' => 'pro', 'price_cents' => 4500, 'sites_limit' => 10, 'db_limit' => 10, 'email_limit' => 25, 'disk_mb' => 51200, 'position' => 2],
+            ['name' => 'Business', 'slug' => 'business', 'price_cents' => 12000, 'sites_limit' => 100, 'db_limit' => 100, 'email_limit' => 250, 'disk_mb' => 256000, 'position' => 3],
+        ])->mapWithKeys(fn ($p) => [$p['slug'] => \App\Models\Plan::updateOrCreate(['slug' => $p['slug']], $p)]);
+
         User::updateOrCreate(['email' => 'operator@convorocp.test'], [
             'name' => 'Ernest (Operator)',
             'role' => 'operator',
@@ -25,6 +31,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Daniel Okafor',
             'role' => 'client',
             'password' => bcrypt('password'),
+            'plan_id' => $plans['pro']->id,
+            'subscribed_at' => now(),
         ]);
 
         foreach ([

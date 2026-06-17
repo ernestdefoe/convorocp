@@ -48,6 +48,14 @@ class SiteController extends Controller
             'php_version' => ['nullable', 'in:'.implode(',', config('convorocp.php_versions'))],
         ]);
 
+        $user = $request->user();
+        if ($user->isClient() && $user->plan) {
+            $count = Site::where('user_id', $user->id)->count();
+            if ($count >= $user->plan->sites_limit) {
+                return back()->withErrors(['domain' => "Your {$user->plan->name} plan allows {$user->plan->sites_limit} site(s). Upgrade to add more."]);
+            }
+        }
+
         $site = Site::create([
             'user_id' => $request->user()->id,
             'domain' => strtolower($data['domain']),

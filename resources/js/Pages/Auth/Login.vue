@@ -37,7 +37,10 @@ const field = 'width:100%;box-sizing:border-box;margin-top:6px;background:var(--
                     </button>
                 </form>
             </div>
-            <p style="text-align: center; font-size: 11.5px; color: var(--cp-dim); margin-top: 16px; line-height: 1.6">
+            <p style="text-align: center; font-size: 12px; color: var(--cp-mut); margin-top: 16px">
+                New here? <a href="/signup" style="color: var(--cp-vio); text-decoration: none; font-weight: 500">Create an account</a>
+            </p>
+            <p style="text-align: center; font-size: 11.5px; color: var(--cp-dim); margin-top: 10px; line-height: 1.6">
                 Demo · operator@convorocp.test / client@convorocp.test<br>password: <span style="font-family: ui-monospace, monospace">password</span>
             </p>
         </div>
