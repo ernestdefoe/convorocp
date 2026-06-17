@@ -49,6 +49,7 @@ Route::middleware('auth')->get('/', function (Request $request) {
                 'node' => 'web-01',
                 'mrr' => '$'.number_format(($u->plan?->price_cents ?? 0) / 100, 0),
             ])->values(),
+            'node' => \App\Support\ServerMetrics::snapshot(),
         ]);
     }
 

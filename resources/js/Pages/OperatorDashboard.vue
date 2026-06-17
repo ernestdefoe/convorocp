@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '../Layouts/AppLayout.vue';
 
-defineProps({ metrics: Array, customers: Array });
+defineProps({ metrics: Array, customers: Array, node: Object });
 
 const tone = (t) => ({ grn: 'var(--cp-grn)', amb: 'var(--cp-amb)', cy: 'var(--cp-cy)', mut: 'var(--cp-mut)' }[t] || 'var(--cp-mut)');
 const planStyle = (p) => ({
@@ -54,10 +54,15 @@ const planStyle = (p) => ({
                 <div style="display: flex; gap: 8px; font-size: 12.5px"><span style="flex: 1">Business</span><span style="color: var(--cp-dim)">30 subs</span><span style="font-weight: 500">$120/mo</span></div>
             </div>
             <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px">
-                <div style="font-size: 13px; font-weight: 600; margin-bottom: 11px">Nodes</div>
-                <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 9px"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--cp-grn)"></span><span style="flex: 1">web-01</span><span style="color: var(--cp-dim)">62% · 48 sites</span></div>
-                <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 9px"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--cp-grn)"></span><span style="flex: 1">web-02</span><span style="color: var(--cp-dim)">41% · 33 sites</span></div>
-                <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px"><span style="width: 7px; height: 7px; border-radius: 50%; background: var(--cp-amb)"></span><span style="flex: 1">web-03</span><span style="color: var(--cp-dim)">83% · 61 sites</span></div>
+                <div style="display: flex; align-items: center; margin-bottom: 12px"><span style="font-size: 13px; font-weight: 600; flex: 1">web-01 · node health</span><span style="font-size: 11px; color: var(--cp-dim)">up {{ node?.uptime }}</span></div>
+                <div v-for="bar in [
+                    { label: 'CPU', pct: node?.cpu?.pct, detail: (node?.cpu?.load) + ' load · ' + (node?.cpu?.cores) + ' cores', color: 'var(--cp-ind)' },
+                    { label: 'Memory', pct: node?.memory?.pct, detail: node?.memory?.used_mb + ' / ' + node?.memory?.total_mb + ' MB', color: 'var(--cp-vio)' },
+                    { label: 'Disk', pct: node?.disk?.pct, detail: node?.disk?.used_gb + ' / ' + node?.disk?.total_gb + ' GB', color: 'var(--cp-cy)' },
+                ]" :key="bar.label" style="margin-bottom: 10px">
+                    <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px"><span style="color: var(--cp-mut)">{{ bar.label }} <span style="color: var(--cp-dim)">{{ bar.detail }}</span></span><span style="color: var(--cp-mut)">{{ bar.pct }}%</span></div>
+                    <div style="height: 5px; border-radius: 4px; background: var(--cp-soft)"><div :style="`width:${bar.pct}%;height:100%;border-radius:4px;background:${bar.color}`"></div></div>
+                </div>
             </div>
         </div>
     </AppLayout>
