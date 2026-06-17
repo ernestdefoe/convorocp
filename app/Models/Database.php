@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Database extends Model
 {
-    protected $fillable = ['user_id', 'name', 'engine', 'db_user'];
+    protected $fillable = ['user_id', 'name', 'engine', 'db_user', 'db_password'];
 
     public function owner(): BelongsTo
     {

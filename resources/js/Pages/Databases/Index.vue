@@ -50,7 +50,7 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 <i class="ti ti-database" :style="`font-size:17px;color:${engineColor(d.engine)}`" aria-hidden="true"></i>
                 <span style="flex: 1; font-weight: 500; font-family: ui-monospace, monospace">{{ d.name }}</span>
                 <span v-if="isOperator && d.owner" style="font-size: 11.5px; color: var(--cp-dim)">{{ d.owner }}</span>
-                <span style="font-size: 11px; color: var(--cp-mut); font-family: ui-monospace, monospace">{{ d.db_user }}</span>
+                <span style="font-size: 11px; color: var(--cp-mut); font-family: ui-monospace, monospace; line-height: 1.4">{{ d.db_user }}<br><span style="color: var(--cp-dim)">{{ d.password }}</span></span>
                 <span style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--cp-soft); color: var(--cp-mut)">{{ engines[d.engine] }}</span>
                 <button type="button" @click="destroy(d)" aria-label="Drop database" style="border: 0; background: transparent; color: var(--cp-dim); cursor: pointer; padding: 0"><i class="ti ti-trash" style="font-size: 15px" aria-hidden="true"></i></button>
             </div>

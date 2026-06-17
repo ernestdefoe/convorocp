@@ -24,6 +24,7 @@ class DatabaseController extends Controller
             'name' => $d->name,
             'engine' => $d->engine,
             'db_user' => $d->db_user,
+            'password' => $d->db_password,
             'owner' => $d->owner?->name,
         ]);
 
@@ -41,15 +42,17 @@ class DatabaseController extends Controller
         ]);
 
         $dbUser = Str::limit($data['name'], 24, '').'_user';
+        $password = Str::random(20);
         Database::create([
             'user_id' => $request->user()->id,
             'name' => $data['name'],
             'engine' => $data['engine'],
             'db_user' => $dbUser,
+            'db_password' => $password,
         ]);
 
         Agent::dispatch('db.create', ['name' => $data['name'], 'engine' => $data['engine']]);
-        Agent::dispatch('db.user.create', ['name' => $dbUser, 'engine' => $data['engine'], 'grant' => $data['name']]);
+        Agent::dispatch('db.user.create', ['user' => $dbUser, 'engine' => $data['engine'], 'grant' => $data['name'], 'password' => $password]);
 
         return redirect('/databases');
     }
@@ -57,7 +60,7 @@ class DatabaseController extends Controller
     public function destroy(Request $request, Database $database)
     {
         abort_unless($request->user()->isOperator() || $database->user_id === $request->user()->id, 403);
-        Agent::dispatch('db.drop', ['name' => $database->name, 'engine' => $database->engine]);
+        Agent::dispatch('db.drop', ['name' => $database->name, 'engine' => $database->engine, 'user' => $database->db_user]);
         $database->delete();
 
         return redirect('/databases');

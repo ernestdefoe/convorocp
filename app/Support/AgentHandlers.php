@@ -23,6 +23,9 @@ class AgentHandlers
         'cert.issue' => 'certIssue',
         'php.install' => 'phpInstall',
         'php.uninstall' => 'phpUninstall',
+        'db.create' => 'dbCreate',
+        'db.user.create' => 'dbUserCreate',
+        'db.drop' => 'dbDrop',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -223,6 +226,101 @@ class AgentHandlers
         if (class_exists(\App\Models\PhpRuntime::class)) {
             \App\Models\PhpRuntime::where('version', $v)->update(['status' => $status]);
         }
+    }
+
+    // ---- Databases ------------------------------------------------------
+
+    private static function dbCreate(array $args): array
+    {
+        $name = self::ident($args['name'] ?? '');
+        $engine = self::dbEngine($args);
+
+        if ($engine === 'pgsql') {
+            $exists = self::run(['sudo', '-u', 'postgres', 'psql', '-tAc', "SELECT 1 FROM pg_database WHERE datname='{$name}'"]);
+            if (trim($exists->output()) !== '1') {
+                $r = self::run(['sudo', '-u', 'postgres', 'createdb', $name]);
+                if (! $r->successful()) {
+                    throw new \RuntimeException('createdb failed: '.trim($r->errorOutput()));
+                }
+            }
+        } elseif ($engine === 'sqlite') {
+            $dir = '/var/lib/convorocp/sqlite';
+            if (! is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            touch("{$dir}/{$name}.sqlite");
+            self::run(['chown', 'www-data:www-data', "{$dir}/{$name}.sqlite"]);
+        } else {
+            $r = self::run(['mysql', '-e', "CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"]);
+            if (! $r->successful()) {
+                throw new \RuntimeException('mysql create failed: '.trim($r->errorOutput()));
+            }
+        }
+
+        return ['applied' => true, 'name' => $name, 'engine' => $engine];
+    }
+
+    private static function dbUserCreate(array $args): array
+    {
+        $engine = self::dbEngine($args);
+        $user = self::ident($args['user'] ?? '');
+        $db = self::ident($args['grant'] ?? '');
+        $pass = (string) ($args['password'] ?? '');
+        if (! preg_match('/^[A-Za-z0-9]+$/', $pass)) {
+            throw new \RuntimeException('Invalid db password.');
+        }
+
+        if ($engine === 'pgsql') {
+            self::run(['sudo', '-u', 'postgres', 'psql', '-c', "CREATE ROLE \"{$user}\" LOGIN PASSWORD '{$pass}'"]);
+            self::run(['sudo', '-u', 'postgres', 'psql', '-c', "GRANT ALL PRIVILEGES ON DATABASE \"{$db}\" TO \"{$user}\""]);
+        } elseif ($engine !== 'sqlite') {
+            $r = self::run(['mysql', '-e', "CREATE USER IF NOT EXISTS '{$user}'@'localhost' IDENTIFIED BY '{$pass}'; GRANT ALL PRIVILEGES ON `{$db}`.* TO '{$user}'@'localhost'; FLUSH PRIVILEGES;"]);
+            if (! $r->successful()) {
+                throw new \RuntimeException('mysql user create failed: '.trim($r->errorOutput()));
+            }
+        }
+
+        return ['applied' => true, 'user' => $user, 'engine' => $engine];
+    }
+
+    private static function dbDrop(array $args): array
+    {
+        $name = self::ident($args['name'] ?? '');
+        $engine = self::dbEngine($args);
+        $user = isset($args['user']) && $args['user'] !== '' ? self::ident($args['user']) : null;
+
+        if ($engine === 'pgsql') {
+            self::run(['sudo', '-u', 'postgres', 'dropdb', '--if-exists', $name]);
+            if ($user) {
+                self::run(['sudo', '-u', 'postgres', 'psql', '-c', "DROP ROLE IF EXISTS \"{$user}\""]);
+            }
+        } elseif ($engine === 'sqlite') {
+            @unlink("/var/lib/convorocp/sqlite/{$name}.sqlite");
+        } else {
+            $sql = "DROP DATABASE IF EXISTS `{$name}`;";
+            if ($user) {
+                $sql .= " DROP USER IF EXISTS '{$user}'@'localhost';";
+            }
+            self::run(['mysql', '-e', $sql]);
+        }
+
+        return ['applied' => true, 'name' => $name, 'engine' => $engine, 'dropped' => true];
+    }
+
+    private static function dbEngine(array $args): string
+    {
+        $e = $args['engine'] ?? 'mariadb';
+
+        return in_array($e, ['mariadb', 'mysql', 'pgsql', 'sqlite'], true) ? $e : 'mariadb';
+    }
+
+    private static function ident(string $v): string
+    {
+        if (! preg_match('/^[a-z0-9_]{1,64}$/i', $v)) {
+            throw new \RuntimeException('Invalid database identifier.');
+        }
+
+        return $v;
     }
 
     // ---- Templates / helpers --------------------------------------------
