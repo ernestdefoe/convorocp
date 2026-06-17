@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
+use App\Http\Controllers\PhpController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SignupController;
@@ -86,6 +87,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}', [CustomerController::class, 'show'])->name('customers.show');
+
+    Route::get('/php', [PhpController::class, 'index'])->name('php.index');
+    Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');
+    Route::post('/php/{runtime}/uninstall', [PhpController::class, 'uninstall'])->name('php.uninstall');
 
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');

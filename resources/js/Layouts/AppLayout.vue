@@ -17,6 +17,7 @@ const navSets = {
         { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
+        { key: 'php', label: 'PHP', icon: 'ti-brand-php', href: '/php' },
         { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },

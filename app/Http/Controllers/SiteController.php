@@ -36,7 +36,7 @@ class SiteController extends Controller
 
         return Inertia::render('Sites/Index', [
             'sites' => $sites,
-            'phpVersions' => config('convorocp.php_versions'),
+            'phpVersions' => \App\Models\PhpRuntime::installed(),
         ]);
     }
 
@@ -45,7 +45,7 @@ class SiteController extends Controller
         $data = $request->validate([
             'domain' => ['required', 'string', 'max:191', 'unique:sites,domain', 'regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i'],
             'runtime' => ['required', 'in:php,node,static'],
-            'php_version' => ['nullable', 'in:'.implode(',', config('convorocp.php_versions'))],
+            'php_version' => ['nullable', 'in:'.implode(',', \App\Models\PhpRuntime::installed())],
         ]);
 
         $user = $request->user();
@@ -60,7 +60,7 @@ class SiteController extends Controller
             'user_id' => $request->user()->id,
             'domain' => strtolower($data['domain']),
             'runtime' => $data['runtime'],
-            'php_version' => $data['runtime'] === 'php' ? ($data['php_version'] ?? config('convorocp.php_versions')[0]) : null,
+            'php_version' => $data['runtime'] === 'php' ? ($data['php_version'] ?? \App\Models\PhpRuntime::installed()[0]) : null,
             'status' => 'active',
             'ssl_status' => 'pending',
         ]);
@@ -87,7 +87,7 @@ class SiteController extends Controller
                 'branch' => $site->branch,
                 'auto_deploy' => $site->auto_deploy,
             ],
-            'phpVersions' => config('convorocp.php_versions'),
+            'phpVersions' => \App\Models\PhpRuntime::installed(),
         ]);
     }
 
@@ -95,7 +95,7 @@ class SiteController extends Controller
     {
         $this->authorizeSite($request, $site);
         $data = $request->validate([
-            'php_version' => ['required', 'in:'.implode(',', config('convorocp.php_versions'))],
+            'php_version' => ['required', 'in:'.implode(',', \App\Models\PhpRuntime::installed())],
         ]);
 
         $site->update(['php_version' => $data['php_version']]);

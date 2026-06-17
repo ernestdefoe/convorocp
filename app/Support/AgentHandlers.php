@@ -20,10 +20,24 @@ class AgentHandlers
         'site.set_php_version' => 'siteSetPhpVersion',
         'site.delete' => 'siteDelete',
         'cert.issue' => 'certIssue',
+        'php.install' => 'phpInstall',
+        'php.uninstall' => 'phpUninstall',
     ];
 
-    /** PHP versions actually installed on this node. */
-    private const PHP_VERSIONS = ['8.3', '8.4'];
+    /** PHP versions actually installed on this node (detected from /etc/php). */
+    private static function installedVersions(): array
+    {
+        $out = [];
+        foreach (glob('/etc/php/*', GLOB_ONLYDIR) ?: [] as $dir) {
+            $v = basename($dir);
+            if (preg_match('/^\d+\.\d+$/', $v) && is_dir("{$dir}/fpm")) {
+                $out[] = $v;
+            }
+        }
+        rsort($out);
+
+        return $out ?: ['8.3'];
+    }
 
     /** @return array<string,mixed> the operation result */
     public static function apply(string $op, array $args, bool $dryRun = true): array
@@ -53,7 +67,7 @@ class AgentHandlers
             throw new \RuntimeException('Invalid domain.');
         }
         $runtime = in_array(($args['runtime'] ?? 'php'), ['php', 'static', 'node'], true) ? $args['runtime'] : 'php';
-        $php = in_array(($args['php'] ?? ''), self::PHP_VERSIONS, true) ? $args['php'] : self::PHP_VERSIONS[0];
+        $php = in_array(($args['php'] ?? ''), self::installedVersions(), true) ? $args['php'] : self::installedVersions()[0];
 
         $base = "/var/www/sites/{$domain}";
         $root = "{$base}/public";
@@ -99,12 +113,12 @@ class AgentHandlers
     private static function siteSetPhpVersion(array $args): array
     {
         $domain = self::domain($args);
-        $php = in_array(($args['php'] ?? ''), self::PHP_VERSIONS, true) ? $args['php'] : self::PHP_VERSIONS[0];
+        $php = in_array(($args['php'] ?? ''), self::installedVersions(), true) ? $args['php'] : self::installedVersions()[0];
         $sock = "/run/php/cp-{$domain}.sock";
 
         // The socket name is version-independent; move the pool to the chosen
         // version and drop it from the others so only one FPM owns the socket.
-        foreach (self::PHP_VERSIONS as $v) {
+        foreach (self::installedVersions() as $v) {
             $pool = "/etc/php/{$v}/fpm/pool.d/{$domain}.conf";
             if ($v === $php) {
                 file_put_contents($pool, self::fpmPool($domain, $sock));
@@ -122,7 +136,7 @@ class AgentHandlers
         $domain = self::domain($args);
         @unlink("/etc/nginx/sites-enabled/{$domain}");
         @unlink("/etc/nginx/sites-available/{$domain}");
-        foreach (self::PHP_VERSIONS as $v) {
+        foreach (self::installedVersions() as $v) {
             if (file_exists("/etc/php/{$v}/fpm/pool.d/{$domain}.conf")) {
                 @unlink("/etc/php/{$v}/fpm/pool.d/{$domain}.conf");
                 self::run(['systemctl', 'reload', "php{$v}-fpm"]);
@@ -152,6 +166,50 @@ class AgentHandlers
         self::run(['systemctl', 'reload', 'nginx']);
 
         return ['applied' => true, 'domain' => $domain, 'staging' => $staging];
+    }
+
+    private static function phpInstall(array $args): array
+    {
+        $v = self::phpVersion($args);
+        $pkgs = ["php{$v}-fpm", "php{$v}-cli", "php{$v}-mbstring", "php{$v}-xml", "php{$v}-curl",
+            "php{$v}-zip", "php{$v}-sqlite3", "php{$v}-bcmath", "php{$v}-intl", "php{$v}-gd"];
+
+        $r = self::run(array_merge(['apt-get', 'install', '-y', '-q'], $pkgs), 600, ['DEBIAN_FRONTEND' => 'noninteractive']);
+        if (! $r->successful()) {
+            self::markRuntime($v, 'available');
+            throw new \RuntimeException("apt install php{$v} failed: ".trim($r->errorOutput()));
+        }
+        self::run(['systemctl', 'enable', '--now', "php{$v}-fpm"]);
+        self::markRuntime($v, 'installed');
+
+        return ['applied' => true, 'version' => $v, 'installed' => true];
+    }
+
+    private static function phpUninstall(array $args): array
+    {
+        $v = self::phpVersion($args);
+        self::run(['apt-get', 'purge', '-y', '-q', "php{$v}-fpm", "php{$v}-common"], 300, ['DEBIAN_FRONTEND' => 'noninteractive']);
+        self::run(['apt-get', 'autoremove', '-y', '-q'], 300, ['DEBIAN_FRONTEND' => 'noninteractive']);
+        self::markRuntime($v, 'available');
+
+        return ['applied' => true, 'version' => $v, 'removed' => true];
+    }
+
+    private static function phpVersion(array $args): string
+    {
+        $v = (string) ($args['version'] ?? '');
+        if (! preg_match('/^\d+\.\d+$/', $v)) {
+            throw new \RuntimeException('Invalid PHP version.');
+        }
+
+        return $v;
+    }
+
+    private static function markRuntime(string $v, string $status): void
+    {
+        if (class_exists(\App\Models\PhpRuntime::class)) {
+            \App\Models\PhpRuntime::where('version', $v)->update(['status' => $status]);
+        }
     }
 
     // ---- Templates / helpers --------------------------------------------
@@ -185,9 +243,14 @@ class AgentHandlers
             ."    index index.php index.html;\n    location / { {$tryFiles} }{$phpLoc}\n    location ~ /\\.ht { deny all; }\n}\n";
     }
 
-    private static function run(array $cmd, int $timeout = 60)
+    private static function run(array $cmd, int $timeout = 60, array $env = [])
     {
-        return Process::timeout($timeout)->run($cmd);
+        $p = Process::timeout($timeout);
+        if ($env) {
+            $p = $p->env($env);
+        }
+
+        return $p->run($cmd);
     }
 
     private static function describe(string $op, array $args): string
@@ -203,6 +266,8 @@ class AgentHandlers
             str_starts_with($op, 'dns.') => "write + reload the zone for {$d}",
             str_starts_with($op, 'cron.') => "write systemd timer for task {$d}",
             str_starts_with($op, 'daemon.') => "write/control systemd unit for daemon {$d}",
+            $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
+            $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
             default => "apply {$op}",
         };
     }
