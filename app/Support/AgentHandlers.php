@@ -17,6 +17,9 @@ class AgentHandlers
     /** op name => handler method */
     private const HANDLERS = [
         'site.create' => 'siteCreate',
+        'site.set_php_version' => 'siteSetPhpVersion',
+        'site.delete' => 'siteDelete',
+        'cert.issue' => 'certIssue',
     ];
 
     /** PHP versions actually installed on this node. */
@@ -93,7 +96,75 @@ class AgentHandlers
         return ['applied' => true, 'domain' => $domain, 'root' => $root, 'runtime' => $runtime, 'php' => $runtime === 'php' ? $php : null];
     }
 
+    private static function siteSetPhpVersion(array $args): array
+    {
+        $domain = self::domain($args);
+        $php = in_array(($args['php'] ?? ''), self::PHP_VERSIONS, true) ? $args['php'] : self::PHP_VERSIONS[0];
+        $sock = "/run/php/cp-{$domain}.sock";
+
+        // The socket name is version-independent; move the pool to the chosen
+        // version and drop it from the others so only one FPM owns the socket.
+        foreach (self::PHP_VERSIONS as $v) {
+            $pool = "/etc/php/{$v}/fpm/pool.d/{$domain}.conf";
+            if ($v === $php) {
+                file_put_contents($pool, self::fpmPool($domain, $sock));
+            } elseif (file_exists($pool)) {
+                @unlink($pool);
+            }
+            self::run(['systemctl', 'reload', "php{$v}-fpm"]);
+        }
+
+        return ['applied' => true, 'domain' => $domain, 'php' => $php];
+    }
+
+    private static function siteDelete(array $args): array
+    {
+        $domain = self::domain($args);
+        @unlink("/etc/nginx/sites-enabled/{$domain}");
+        @unlink("/etc/nginx/sites-available/{$domain}");
+        foreach (self::PHP_VERSIONS as $v) {
+            if (file_exists("/etc/php/{$v}/fpm/pool.d/{$domain}.conf")) {
+                @unlink("/etc/php/{$v}/fpm/pool.d/{$domain}.conf");
+                self::run(['systemctl', 'reload', "php{$v}-fpm"]);
+            }
+        }
+        self::run(['rm', '-rf', "/var/www/sites/{$domain}"]);
+        self::run(['systemctl', 'reload', 'nginx']);
+
+        return ['applied' => true, 'domain' => $domain, 'deleted' => true];
+    }
+
+    private static function certIssue(array $args): array
+    {
+        $domain = self::domain($args);
+        $staging = (bool) config('convorocp.agent.cert_staging', true);
+        $email = (string) (config('convorocp.agent.cert_email') ?: "admin@{$domain}");
+
+        $cmd = ['certbot', '--nginx', '-d', $domain, '--non-interactive', '--agree-tos', '-m', $email, '--redirect', '--keep-until-expiring'];
+        if ($staging) {
+            $cmd[] = '--staging';
+        }
+
+        $r = self::run($cmd, 180);
+        if (! $r->successful()) {
+            throw new \RuntimeException('certbot failed: '.trim($r->errorOutput().' '.$r->output()));
+        }
+        self::run(['systemctl', 'reload', 'nginx']);
+
+        return ['applied' => true, 'domain' => $domain, 'staging' => $staging];
+    }
+
     // ---- Templates / helpers --------------------------------------------
+
+    private static function domain(array $args): string
+    {
+        $domain = (string) ($args['domain'] ?? '');
+        if (! preg_match('/^[a-z0-9.-]+$/i', $domain) || str_contains($domain, '..')) {
+            throw new \RuntimeException('Invalid domain.');
+        }
+
+        return $domain;
+    }
 
     private static function fpmPool(string $domain, string $sock): string
     {
@@ -114,9 +185,9 @@ class AgentHandlers
             ."    index index.php index.html;\n    location / { {$tryFiles} }{$phpLoc}\n    location ~ /\\.ht { deny all; }\n}\n";
     }
 
-    private static function run(array $cmd)
+    private static function run(array $cmd, int $timeout = 60)
     {
-        return Process::timeout(60)->run($cmd);
+        return Process::timeout($timeout)->run($cmd);
     }
 
     private static function describe(string $op, array $args): string

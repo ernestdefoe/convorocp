@@ -27,5 +27,7 @@ return [
     'agent' => [
         'dry_run' => env('CONVOROCP_AGENT_DRY_RUN', true),
         'poll_seconds' => 2,
+        'cert_staging' => env('CONVOROCP_CERT_STAGING', true),
+        'cert_email' => env('CONVOROCP_CERT_EMAIL', 'admin@convorocp.test'),
     ],
 ];

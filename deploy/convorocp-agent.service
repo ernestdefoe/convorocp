@@ -1,0 +1,14 @@
+[Unit]
+Description=ConvoroCP agent worker — drains the operation queue and applies changes (runs as root on the node)
+After=network.target nginx.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/convorocp
+ExecStart=/usr/bin/php8.4 /var/www/convorocp/artisan agent:run
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
