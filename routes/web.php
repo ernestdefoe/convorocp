@@ -64,6 +64,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
     Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
+    Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');
     Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
 
     Route::get('/databases', [DatabaseController::class, 'index'])->name('databases.index');

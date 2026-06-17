@@ -18,6 +18,7 @@ class AgentHandlers
     private const HANDLERS = [
         'site.create' => 'siteCreate',
         'site.set_php_version' => 'siteSetPhpVersion',
+        'site.set_php_settings' => 'siteSetPhpSettings',
         'site.delete' => 'siteDelete',
         'cert.issue' => 'certIssue',
         'php.install' => 'phpInstall',
@@ -85,7 +86,7 @@ class AgentHandlers
         $sock = null;
         if ($runtime === 'php') {
             $sock = "/run/php/cp-{$domain}.sock";
-            file_put_contents("/etc/php/{$php}/fpm/pool.d/{$domain}.conf", self::fpmPool($domain, $sock));
+            file_put_contents("/etc/php/{$php}/fpm/pool.d/{$domain}.conf", self::fpmPool($domain, $sock, $args['settings'] ?? []));
             $r = self::run(['systemctl', 'reload', "php{$php}-fpm"]);
             if (! $r->successful()) {
                 throw new \RuntimeException('php-fpm reload failed: '.trim($r->errorOutput()));
@@ -127,6 +128,18 @@ class AgentHandlers
             }
             self::run(['systemctl', 'reload', "php{$v}-fpm"]);
         }
+
+        return ['applied' => true, 'domain' => $domain, 'php' => $php];
+    }
+
+    private static function siteSetPhpSettings(array $args): array
+    {
+        $domain = self::domain($args);
+        $php = in_array(($args['php'] ?? ''), self::installedVersions(), true) ? $args['php'] : self::installedVersions()[0];
+        $sock = "/run/php/cp-{$domain}.sock";
+
+        file_put_contents("/etc/php/{$php}/fpm/pool.d/{$domain}.conf", self::fpmPool($domain, $sock, $args['settings'] ?? []));
+        self::run(['systemctl', 'reload', "php{$php}-fpm"]);
 
         return ['applied' => true, 'domain' => $domain, 'php' => $php];
     }
@@ -224,11 +237,34 @@ class AgentHandlers
         return $domain;
     }
 
-    private static function fpmPool(string $domain, string $sock): string
+    private static function fpmPool(string $domain, string $sock, array $settings = []): string
     {
-        return "[{$domain}]\nuser = www-data\ngroup = www-data\n"
-            ."listen = {$sock}\nlisten.owner = www-data\nlisten.group = www-data\n"
-            ."pm = ondemand\npm.max_children = 5\npm.process_idle_timeout = 10s\npm.max_requests = 500\n";
+        $s = array_merge([
+            'memory_limit' => '256M', 'upload_max_filesize' => '64M', 'post_max_size' => '64M',
+            'max_execution_time' => 30, 'display_errors' => false, 'disable_functions' => [],
+        ], $settings);
+
+        $lines = [
+            "[{$domain}]", 'user = www-data', 'group = www-data',
+            "listen = {$sock}", 'listen.owner = www-data', 'listen.group = www-data',
+            'pm = ondemand', 'pm.max_children = 5', 'pm.process_idle_timeout = 10s', 'pm.max_requests = 500',
+            'php_admin_value[memory_limit] = '.self::iniSize($s['memory_limit']),
+            'php_value[upload_max_filesize] = '.self::iniSize($s['upload_max_filesize']),
+            'php_value[post_max_size] = '.self::iniSize($s['post_max_size']),
+            'php_value[max_execution_time] = '.max(0, (int) $s['max_execution_time']),
+            'php_admin_flag[display_errors] = '.($s['display_errors'] ? 'on' : 'off'),
+        ];
+        $fns = array_values(array_filter((array) ($s['disable_functions'] ?? []), fn ($f) => preg_match('/^[a-z_]+$/i', (string) $f)));
+        if ($fns) {
+            $lines[] = 'php_admin_value[disable_functions] = '.implode(',', $fns);
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    private static function iniSize($v): string
+    {
+        return preg_match('/^\d+[KMG]?$/i', (string) $v) ? (string) $v : '128M';
     }
 
     private static function nginxConf(string $domain, string $root, string $runtime, ?string $sock): string
@@ -261,6 +297,7 @@ class AgentHandlers
             $op === 'site.create' => "render nginx vhost + PHP-FPM pool for {$d}, reload",
             $op === 'site.delete' => "remove vhost + pool + webroot for {$d}",
             $op === 'site.set_php_version' => "point {$d} FPM pool at PHP ".($args['php'] ?? '?'),
+            $op === 'site.set_php_settings' => "apply PHP/INI settings to {$d}",
             str_starts_with($op, 'cert.') => 'ACME '.substr($op, 5)." certificate for {$d}",
             str_starts_with($op, 'db.') => "{$op} on the ".($args['engine'] ?? '?')." engine ({$d})",
             str_starts_with($op, 'dns.') => "write + reload the zone for {$d}",

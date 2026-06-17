@@ -61,11 +61,12 @@ class SiteController extends Controller
             'domain' => strtolower($data['domain']),
             'runtime' => $data['runtime'],
             'php_version' => $data['runtime'] === 'php' ? ($data['php_version'] ?? \App\Models\PhpRuntime::installed()[0]) : null,
+            'php_settings' => Site::defaultPhpSettings(),
             'status' => 'active',
             'ssl_status' => 'pending',
         ]);
 
-        Agent::dispatch('site.create', ['domain' => $site->domain, 'runtime' => $site->runtime, 'php' => $site->php_version]);
+        Agent::dispatch('site.create', ['domain' => $site->domain, 'runtime' => $site->runtime, 'php' => $site->php_version, 'settings' => $site->phpSettings()]);
         Agent::dispatch('cert.issue', ['domain' => $site->domain]);
 
         return redirect('/sites/'.$site->id);
@@ -86,8 +87,10 @@ class SiteController extends Controller
                 'repo' => $site->repo,
                 'branch' => $site->branch,
                 'auto_deploy' => $site->auto_deploy,
+                'php_settings' => $site->phpSettings(),
             ],
             'phpVersions' => \App\Models\PhpRuntime::installed(),
+            'disableableFunctions' => Site::DISABLEABLE_FUNCTIONS,
         ]);
     }
 
@@ -99,7 +102,37 @@ class SiteController extends Controller
         ]);
 
         $site->update(['php_version' => $data['php_version']]);
-        Agent::dispatch('site.set_php_version', ['domain' => $site->domain, 'php' => $data['php_version']]);
+        Agent::dispatch('site.set_php_version', ['domain' => $site->domain, 'php' => $data['php_version'], 'settings' => $site->phpSettings()]);
+
+        return back();
+    }
+
+    public function setPhpSettings(Request $request, Site $site)
+    {
+        $this->authorizeSite($request, $site);
+        $data = $request->validate([
+            'memory_limit' => ['required', 'regex:/^\d+[KMG]?$/i'],
+            'upload_max_filesize' => ['required', 'regex:/^\d+[KMG]?$/i'],
+            'post_max_size' => ['required', 'regex:/^\d+[KMG]?$/i'],
+            'max_execution_time' => ['required', 'integer', 'min:0', 'max:3600'],
+            'display_errors' => ['boolean'],
+            'disable_functions' => ['array'],
+            'disable_functions.*' => ['in:'.implode(',', Site::DISABLEABLE_FUNCTIONS)],
+        ]);
+
+        $settings = [
+            'memory_limit' => strtoupper($data['memory_limit']),
+            'upload_max_filesize' => strtoupper($data['upload_max_filesize']),
+            'post_max_size' => strtoupper($data['post_max_size']),
+            'max_execution_time' => (int) $data['max_execution_time'],
+            'display_errors' => $request->boolean('display_errors'),
+            'disable_functions' => array_values($data['disable_functions'] ?? []),
+        ];
+        $site->update(['php_settings' => $settings]);
+
+        if ($site->runtime === 'php') {
+            Agent::dispatch('site.set_php_settings', ['domain' => $site->domain, 'php' => $site->php_version, 'settings' => $settings]);
+        }
 
         return back();
     }
