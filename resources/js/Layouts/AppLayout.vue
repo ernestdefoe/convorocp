@@ -13,7 +13,7 @@ const props = defineProps({
 const navSets = {
     operator: [
         { key: 'overview', label: 'Overview', icon: 'ti-chart-line', href: '/' },
-        { key: 'customers', label: 'Customers', icon: 'ti-users', href: '#' },
+        { key: 'customers', label: 'Customers', icon: 'ti-users', href: '/customers' },
         { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },

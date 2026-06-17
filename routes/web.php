@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
@@ -23,19 +24,25 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 
 Route::middleware('auth')->get('/', function (Request $request) {
     if ($request->user()->isOperator()) {
+        $clients = \App\Models\User::where('role', 'client')->with('plan')->withCount('sites')->get();
+        $mrr = $clients->sum(fn ($u) => $u->plan?->price_cents ?? 0) / 100;
+        $initials = fn ($n) => collect(explode(' ', $n))->map(fn ($p) => mb_substr($p, 0, 1))->take(2)->implode('');
+
         return Inertia::render('OperatorDashboard', [
             'metrics' => [
-                ['label' => 'MRR', 'value' => '$8,420', 'sub' => '+9% MoM', 'tone' => 'grn'],
-                ['label' => 'Active customers', 'value' => '142', 'sub' => '+6 this week', 'tone' => 'grn'],
-                ['label' => 'Nodes', 'value' => '6', 'sub' => 'all healthy', 'tone' => 'mut'],
-                ['label' => 'Open tickets', 'value' => '3', 'sub' => '1 overdue', 'tone' => 'amb'],
+                ['label' => 'MRR', 'value' => '$'.number_format($mrr, 0), 'sub' => 'recurring', 'tone' => 'grn'],
+                ['label' => 'Active customers', 'value' => (string) $clients->count(), 'sub' => 'subscribed', 'tone' => 'grn'],
+                ['label' => 'Nodes', 'value' => '1', 'sub' => 'all healthy', 'tone' => 'mut'],
+                ['label' => 'Sites', 'value' => (string) \App\Models\Site::count(), 'sub' => 'hosted', 'tone' => 'mut'],
             ],
-            'customers' => [
-                ['name' => 'Maya Rodriguez', 'initials' => 'MR', 'plan' => 'Business', 'sites' => 7, 'node' => 'web-01', 'mrr' => '$120'],
-                ['name' => 'Daniel Okafor', 'initials' => 'DO', 'plan' => 'Pro', 'sites' => 3, 'node' => 'web-02', 'mrr' => '$45'],
-                ['name' => 'Sara Lindqvist', 'initials' => 'SL', 'plan' => 'Pro', 'sites' => 2, 'node' => 'web-01', 'mrr' => '$45'],
-                ['name' => 'Tomás Núñez', 'initials' => 'TN', 'plan' => 'Starter', 'sites' => 1, 'node' => 'web-03', 'mrr' => '$12'],
-            ],
+            'customers' => $clients->sortByDesc('created_at')->take(5)->map(fn ($u) => [
+                'name' => $u->name,
+                'initials' => $initials($u->name),
+                'plan' => $u->plan?->name ?? '—',
+                'sites' => $u->sites_count,
+                'node' => 'web-01',
+                'mrr' => '$'.number_format(($u->plan?->price_cents ?? 0) / 100, 0),
+            ])->values(),
         ]);
     }
 
@@ -76,6 +83,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/daemons', [DaemonController::class, 'store'])->name('daemons.store');
     Route::post('/daemons/{daemon}/{action}', [DaemonController::class, 'action'])->name('daemons.action');
     Route::delete('/daemons/{daemon}', [DaemonController::class, 'destroy'])->name('daemons.destroy');
+
+    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::get('/customers/{user}', [CustomerController::class, 'show'])->name('customers.show');
 
     Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
     Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');

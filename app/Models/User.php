@@ -32,6 +32,16 @@ class User extends Authenticatable
         return $this->belongsTo(Plan::class);
     }
 
+    public function sites(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Site::class);
+    }
+
+    public function databases(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Database::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
