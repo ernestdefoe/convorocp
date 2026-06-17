@@ -21,6 +21,7 @@ const navSets = {
         { key: 'containers', label: 'Docker', icon: 'ti-brand-docker', href: '/containers' },
         { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
+        { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
@@ -35,6 +36,7 @@ const navSets = {
         { key: 'files', label: 'Files', icon: 'ti-folder', href: '#' },
         { key: 'containers', label: 'Docker', icon: 'ti-brand-docker', href: '/containers' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
+        { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
         { key: 'support', label: 'Support', icon: 'ti-lifebuoy', href: '#' },
     ],
     server: [

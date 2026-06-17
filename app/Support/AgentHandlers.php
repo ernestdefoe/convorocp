@@ -31,6 +31,7 @@ class AgentHandlers
         'container.start' => 'containerStart',
         'container.stop' => 'containerStop',
         'container.remove' => 'containerRemove',
+        'backup.run' => 'backupRun',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -344,6 +345,64 @@ class AgentHandlers
         return ['applied' => true, 'name' => $name, 'engine' => $engine, 'dropped' => true];
     }
 
+    // ---- Backups --------------------------------------------------------
+
+    private static function backupRun(array $args): array
+    {
+        $id = (int) ($args['backup_id'] ?? 0);
+        $kind = ($args['kind'] ?? '') === 'database' ? 'database' : 'site';
+        $target = (string) ($args['target'] ?? '');
+        if ($kind === 'site') {
+            if (! preg_match('/^[a-z0-9.-]+$/i', $target) || str_contains($target, '..')) {
+                throw new \RuntimeException('Invalid backup target.');
+            }
+        } else {
+            $target = self::ident($target);
+        }
+
+        $dir = '/var/backups/convorocp';
+        if (! is_dir($dir)) {
+            mkdir($dir, 0750, true);
+        }
+        $ts = date('Ymd-His');
+
+        try {
+            if ($kind === 'site') {
+                $file = "{$dir}/site-{$target}-{$ts}.tar.gz";
+                $r = self::run(['tar', '-czf', $file, '-C', '/var/www/sites', $target], 600);
+                if (! $r->successful()) {
+                    throw new \RuntimeException(trim($r->errorOutput()));
+                }
+            } else {
+                $engine = self::dbEngine($args);
+                $name = self::ident($target);
+                $file = "{$dir}/db-{$name}-{$ts}.sql.gz";
+                $f = escapeshellarg($file);
+                $cmd = $engine === 'pgsql'
+                    ? 'sudo -u postgres pg_dump '.escapeshellarg($name)." | gzip > {$f}"
+                    : 'mysqldump --single-transaction '.escapeshellarg($name)." | gzip > {$f}";
+                $r = self::run(['bash', '-c', $cmd], 600);
+                if (! $r->successful()) {
+                    throw new \RuntimeException(trim($r->errorOutput()));
+                }
+            }
+            self::run(['chown', '-R', 'www-data:www-data', $dir]);
+            self::markBackup($id, 'done', basename($file), @filesize($file) ?: 0);
+        } catch (\Throwable $e) {
+            self::markBackup($id, 'failed', null, 0);
+            throw $e;
+        }
+
+        return ['applied' => true, 'kind' => $kind, 'target' => $target];
+    }
+
+    private static function markBackup(int $id, string $status, ?string $filename, int $size): void
+    {
+        if ($id && class_exists(\App\Models\Backup::class)) {
+            \App\Models\Backup::where('id', $id)->update(['status' => $status, 'filename' => $filename, 'size' => $size]);
+        }
+    }
+
     private static function dbEngine(array $args): string
     {
         $e = $args['engine'] ?? 'mariadb';
@@ -518,6 +577,7 @@ class AgentHandlers
             str_starts_with($op, 'cron.') => "write systemd timer for task {$d}",
             str_starts_with($op, 'daemon.') => "write/control systemd unit for daemon {$d}",
             str_starts_with($op, 'container.') => substr($op, 10)." docker container ".($args['name'] ?? ''),
+            $op === 'backup.run' => "back up ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
             $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
             default => "apply {$op}",

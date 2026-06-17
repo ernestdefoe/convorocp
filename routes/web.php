@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\ContainerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
@@ -108,6 +109,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/containers', [ContainerController::class, 'store'])->name('containers.store');
     Route::post('/containers/{container}/{action}', [ContainerController::class, 'action'])->name('containers.action');
     Route::delete('/containers/{container}', [ContainerController::class, 'destroy'])->name('containers.destroy');
+
+    Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
+    Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
+    Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
+    Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');
     Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');
