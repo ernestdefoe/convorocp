@@ -11,6 +11,7 @@ use App\Http\Controllers\FileController;
 use App\Http\Controllers\PhpController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SchedulerController;
+use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
@@ -114,6 +115,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
+
+    Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
+    Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');
     Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');

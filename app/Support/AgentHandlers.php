@@ -32,6 +32,7 @@ class AgentHandlers
         'container.stop' => 'containerStop',
         'container.remove' => 'containerRemove',
         'backup.run' => 'backupRun',
+        'service.control' => 'serviceControl',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -345,6 +346,30 @@ class AgentHandlers
         return ['applied' => true, 'name' => $name, 'engine' => $engine, 'dropped' => true];
     }
 
+    // ---- Services -------------------------------------------------------
+
+    /** Services the panel may control. Excludes convorocp-agent (self) for safety. */
+    public static function serviceControllable(string $s): bool
+    {
+        return in_array($s, ['nginx', 'mariadb', 'mysql', 'postgresql', 'docker', 'fail2ban'], true)
+            || (bool) preg_match('/^php\d+\.\d+-fpm$/', $s);
+    }
+
+    private static function serviceControl(array $args): array
+    {
+        $svc = (string) ($args['service'] ?? '');
+        $action = in_array(($args['action'] ?? ''), ['restart', 'start', 'stop', 'reload'], true) ? $args['action'] : 'restart';
+        if (! self::serviceControllable($svc)) {
+            throw new \RuntimeException("Service [{$svc}] is not controllable.");
+        }
+        $r = self::run(['systemctl', $action, $svc]);
+        if (! $r->successful()) {
+            throw new \RuntimeException("systemctl {$action} {$svc} failed: ".trim($r->errorOutput()));
+        }
+
+        return ['applied' => true, 'service' => $svc, 'action' => $action];
+    }
+
     // ---- Backups --------------------------------------------------------
 
     private static function backupRun(array $args): array
@@ -578,6 +603,7 @@ class AgentHandlers
             str_starts_with($op, 'daemon.') => "write/control systemd unit for daemon {$d}",
             str_starts_with($op, 'container.') => substr($op, 10)." docker container ".($args['name'] ?? ''),
             $op === 'backup.run' => "back up ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
+            $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
             $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
             default => "apply {$op}",

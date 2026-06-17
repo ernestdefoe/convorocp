@@ -22,6 +22,7 @@ const navSets = {
         { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
         { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
+        { key: 'services', label: 'Services', icon: 'ti-server-cog', href: '/services' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
