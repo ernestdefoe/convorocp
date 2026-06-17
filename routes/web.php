@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -37,7 +38,15 @@ Route::middleware('auth')->get('/', function (Request $request) {
             ['label' => 'Bandwidth', 'used' => '84', 'total' => '500 GB', 'pct' => 17, 'tone' => 'cy'],
             ['label' => 'Email', 'used' => '4', 'total' => '25', 'pct' => 16, 'tone' => 'vio'],
         ],
-        'sites' => ['danielokafor.com', 'shop.danielokafor.com', 'blog.danielokafor.com'],
+        'sites' => \App\Models\Site::where('user_id', $request->user()->id)->pluck('domain'),
         'invoice' => ['amount' => '$45.00', 'due' => 'Jul 1, 2026', 'card' => 'Visa ending 6411'],
     ]);
 })->name('dashboard');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
+    Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
+    Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
+    Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
+    Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
+});

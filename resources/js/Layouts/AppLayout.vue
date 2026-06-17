@@ -4,7 +4,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import ThemeToggle from '../Components/ThemeToggle.vue';
 
 const props = defineProps({
-    variant: { type: String, default: 'server' },
+    variant: { type: String, default: '' },
     active: { type: String, default: '' },
     title: { type: String, default: '' },
     subtitle: { type: String, default: '' },
@@ -14,15 +14,15 @@ const navSets = {
     operator: [
         { key: 'overview', label: 'Overview', icon: 'ti-chart-line', href: '/' },
         { key: 'customers', label: 'Customers', icon: 'ti-users', href: '#' },
+        { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '#' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
         { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '#' },
-        { key: 'branding', label: 'Branding', icon: 'ti-palette', href: '#' },
     ],
     client: [
         { key: 'home', label: 'My hosting', icon: 'ti-home', href: '/' },
-        { key: 'websites', label: 'Websites', icon: 'ti-world', href: '#' },
+        { key: 'sites', label: 'Websites', icon: 'ti-world', href: '/sites' },
         { key: 'email', label: 'Email', icon: 'ti-mail', href: '#' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '#' },
         { key: 'files', label: 'Files', icon: 'ti-folder', href: '#' },
@@ -31,16 +31,18 @@ const navSets = {
     ],
     server: [
         { key: 'dashboard', label: 'Dashboard', icon: 'ti-layout-dashboard', href: '/' },
-        { key: 'sites', label: 'Sites', icon: 'ti-world', href: '#' },
+        { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '#' },
         { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '#' },
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '#' },
     ],
 };
 
-const nav = computed(() => navSets[props.variant] ?? navSets.server);
+const role = computed(() => usePage().props.auth?.user?.role);
+const effVariant = computed(() => props.variant || (role.value === 'operator' ? 'operator' : role.value === 'client' ? 'client' : 'server'));
+const nav = computed(() => navSets[effVariant.value] ?? navSets.server);
 const activeKey = computed(() => props.active || nav.value[0].key);
-const tag = computed(() => (props.variant === 'operator' ? 'OPERATOR' : props.variant === 'client' ? 'CLIENT' : ''));
+const tag = computed(() => (effVariant.value === 'operator' ? 'OPERATOR' : effVariant.value === 'client' ? 'CLIENT' : ''));
 const user = computed(() => usePage().props.auth?.user ?? { name: 'User', initials: 'U' });
 
 function logout() {
