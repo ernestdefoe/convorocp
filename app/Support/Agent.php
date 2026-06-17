@@ -27,6 +27,7 @@ class Agent
         'container.run', 'container.start', 'container.stop', 'container.remove',
         'backup.run', 'backup.delete',
         'service.control',
+        'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
     ];
 
     public static function dispatch(string $op, array $args): AgentOperation

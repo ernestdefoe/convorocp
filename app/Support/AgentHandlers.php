@@ -33,6 +33,10 @@ class AgentHandlers
         'container.remove' => 'containerRemove',
         'backup.run' => 'backupRun',
         'service.control' => 'serviceControl',
+        'firewall.allow' => 'firewallRule',
+        'firewall.remove' => 'firewallRemove',
+        'firewall.enable' => 'firewallEnable',
+        'firewall.disable' => 'firewallDisable',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -346,6 +350,61 @@ class AgentHandlers
         return ['applied' => true, 'name' => $name, 'engine' => $engine, 'dropped' => true];
     }
 
+    // ---- Firewall (ufw) -------------------------------------------------
+
+    private static function firewallRule(array $args): array
+    {
+        [$port, $proto, $action] = self::fwArgs($args);
+        $r = self::run(['ufw', $action, "{$port}/{$proto}"]);
+        if (! $r->successful()) {
+            throw new \RuntimeException('ufw failed: '.trim($r->errorOutput()));
+        }
+
+        return ['applied' => true, 'rule' => "{$action} {$port}/{$proto}"];
+    }
+
+    private static function firewallRemove(array $args): array
+    {
+        [$port, $proto, $action] = self::fwArgs($args);
+        self::run(['ufw', '--force', 'delete', $action, "{$port}/{$proto}"]);
+
+        return ['applied' => true, 'removed' => "{$action} {$port}/{$proto}"];
+    }
+
+    private static function firewallEnable(array $args): array
+    {
+        // Anti-lockout: always permit SSH + web before enabling.
+        foreach (['22/tcp', '80/tcp', '443/tcp'] as $p) {
+            self::run(['ufw', 'allow', $p]);
+        }
+        $r = self::run(['ufw', '--force', 'enable']);
+        if (! $r->successful()) {
+            throw new \RuntimeException('ufw enable failed: '.trim($r->errorOutput()));
+        }
+
+        return ['applied' => true, 'enabled' => true];
+    }
+
+    private static function firewallDisable(array $args): array
+    {
+        self::run(['ufw', '--force', 'disable']);
+
+        return ['applied' => true, 'enabled' => false];
+    }
+
+    /** @return array{0:int,1:string,2:string} port, proto, action */
+    private static function fwArgs(array $args): array
+    {
+        $port = (int) ($args['port'] ?? 0);
+        if ($port < 1 || $port > 65535) {
+            throw new \RuntimeException('Invalid port.');
+        }
+        $proto = in_array(($args['proto'] ?? ''), ['tcp', 'udp'], true) ? $args['proto'] : 'tcp';
+        $action = in_array(($args['action'] ?? ''), ['allow', 'deny'], true) ? $args['action'] : 'allow';
+
+        return [$port, $proto, $action];
+    }
+
     // ---- Services -------------------------------------------------------
 
     /** Services the panel may control. Excludes convorocp-agent (self) for safety. */
@@ -604,6 +663,7 @@ class AgentHandlers
             str_starts_with($op, 'container.') => substr($op, 10)." docker container ".($args['name'] ?? ''),
             $op === 'backup.run' => "back up ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
+            str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
             $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
             default => "apply {$op}",

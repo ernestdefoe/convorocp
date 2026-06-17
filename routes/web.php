@@ -11,6 +11,7 @@ use App\Http\Controllers\FileController;
 use App\Http\Controllers\PhpController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SchedulerController;
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\SiteController;
@@ -115,6 +116,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
+
+    Route::get('/security', [SecurityController::class, 'index'])->name('security.index');
+    Route::post('/security/rules', [SecurityController::class, 'addRule'])->name('security.rules.add');
+    Route::delete('/security/rules/{rule}', [SecurityController::class, 'removeRule'])->name('security.rules.remove');
+    Route::post('/security/toggle', [SecurityController::class, 'toggle'])->name('security.toggle');
 
     Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
