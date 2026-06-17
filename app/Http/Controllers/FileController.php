@@ -140,9 +140,21 @@ class FileController extends Controller
         $data = $request->validate([
             'path' => ['required', 'string'],
             'mode' => ['required', 'regex:/^0?[0-7]{3}$/'],
+            'recursive' => ['boolean'],
         ]);
         $target = $this->safe($this->base($site), $data['path']);
-        @chmod($target, octdec(substr($data['mode'], -3)));
+        $perm = octdec(substr($data['mode'], -3));
+        @chmod($target, $perm);
+
+        if ($request->boolean('recursive') && is_dir($target)) {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($target, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($it as $entry) {
+                @chmod($entry->getPathname(), $perm);
+            }
+        }
 
         return back();
     }

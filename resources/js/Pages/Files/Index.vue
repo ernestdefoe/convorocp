@@ -23,8 +23,8 @@ function newFolder() {
 const del = (p, name) => { if (confirm(`Delete ${name}?`)) router.delete(`/sites/${props.site.id}/files`, { data: { path: p }, preserveScroll: true }); };
 
 const chmodTarget = ref(null);
-const chmodForm = useForm({ path: '', mode: '' });
-function openChmod(e) { chmodTarget.value = e; chmodForm.path = e.path; chmodForm.mode = e.perms; }
+const chmodForm = useForm({ path: '', mode: '', recursive: false });
+function openChmod(e) { chmodTarget.value = e; chmodForm.path = e.path; chmodForm.mode = e.perms; chmodForm.recursive = false; }
 function applyChmod() { chmodForm.post(`/sites/${props.site.id}/files/chmod`, { preserveScroll: true, onSuccess: () => { chmodTarget.value = null; } }); }
 const presets = ['644', '755', '600', '700', '775', '666'];
 </script>
@@ -88,6 +88,9 @@ const presets = ['644', '755', '600', '700', '775', '666'];
                     <button v-for="p in presets" :key="p" type="button" @click="chmodForm.mode = p"
                         :style="`font-family:ui-monospace,monospace;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--cp-ln);${chmodForm.mode === p ? 'background:var(--cp-ind);color:#fff;border-color:transparent' : 'background:var(--cp-card2);color:var(--cp-mut)'}`">{{ p }}</button>
                 </div>
+                <label v-if="chmodTarget.type === 'dir'" style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--cp-mut); margin-bottom: 16px">
+                    <input type="checkbox" v-model="chmodForm.recursive" /> Apply recursively to all contents
+                </label>
                 <div style="display: flex; justify-content: flex-end; gap: 8px">
                     <button type="button" @click="chmodTarget = null" style="font-size: 12.5px; color: var(--cp-mut); background: transparent; border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-family: inherit">Cancel</button>
                     <button type="button" @click="applyChmod" :disabled="chmodForm.processing" style="font-size: 12.5px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 500; cursor: pointer; font-family: inherit">Apply</button>
