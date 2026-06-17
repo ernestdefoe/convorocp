@@ -95,6 +95,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}', [CustomerController::class, 'show'])->name('customers.show');
 
+    Route::get('/docker/search', [ContainerController::class, 'search'])->name('containers.search');
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');
     Route::post('/containers', [ContainerController::class, 'store'])->name('containers.store');
     Route::post('/containers/{container}/{action}', [ContainerController::class, 'action'])->name('containers.action');

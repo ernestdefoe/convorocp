@@ -11,6 +11,25 @@ const form = useForm({ name: '', image: '', container_port: 80, domain: '', rest
 function create() {
     form.post('/containers', { onSuccess: () => { showForm.value = false; form.reset(); } });
 }
+const suggestions = ref([]);
+let sugTimer = null;
+function onImageInput() {
+    clearTimeout(sugTimer);
+    const q = form.image.trim();
+    if (q.length < 2 || q.includes('/') && q.includes(':')) { suggestions.value = []; return; }
+    sugTimer = setTimeout(async () => {
+        try {
+            const r = await fetch(`/docker/search?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } });
+            suggestions.value = (await r.json()).results || [];
+        } catch (e) { suggestions.value = []; }
+    }, 250);
+}
+function pickImage(name) {
+    form.image = name + ':latest';
+    suggestions.value = [];
+}
+const hideSuggestions = () => setTimeout(() => { suggestions.value = []; }, 150);
+
 const act = (c, a) => router.post(`/containers/${c.id}/${a}`, {}, { preserveScroll: true });
 const destroy = (c) => { if (confirm(`Remove container "${c.name}"?`)) router.delete(`/containers/${c.id}`); };
 const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid var(--cp-ln);border-radius:9px;color:var(--cp-ink);padding:9px 11px;font-size:13px;font-family:inherit';
@@ -28,7 +47,20 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
         <form v-if="showForm" @submit.prevent="create" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 14px 15px; margin-bottom: 14px">
             <div style="display: grid; grid-template-columns: 1fr 1.5fr 90px; gap: 10px">
                 <label style="font-size: 11.5px; color: var(--cp-mut)">Name<input v-model="form.name" :style="field + ';width:100%;margin-top:5px'" placeholder="my-app" /></label>
-                <label style="font-size: 11.5px; color: var(--cp-mut)">Docker Hub image<input v-model="form.image" :style="field + ';width:100%;margin-top:5px'" placeholder="nginxdemos/hello:latest" /></label>
+                <div style="position: relative">
+                    <label style="font-size: 11.5px; color: var(--cp-mut)">Docker Hub image<input v-model="form.image" @input="onImageInput" @focus="onImageInput" @blur="hideSuggestions" autocomplete="off" :style="field + ';width:100%;margin-top:5px'" placeholder="search Docker Hub… e.g. nginx" /></label>
+                    <div v-if="suggestions.length" style="position: absolute; left: 0; right: 0; top: 100%; z-index: 30; margin-top: 4px; background: var(--cp-card); border: 1px solid var(--cp-ln2); border-radius: 10px; overflow: hidden">
+                        <div v-for="sug in suggestions" :key="sug.name" @mousedown.prevent="pickImage(sug.name)"
+                            style="display: flex; align-items: center; gap: 9px; padding: 8px 11px; cursor: pointer; border-bottom: 1px solid var(--cp-ln)">
+                            <i class="ti ti-brand-docker" style="font-size: 15px; color: var(--cp-cy)" aria-hidden="true"></i>
+                            <div style="flex: 1; min-width: 0">
+                                <div style="font-size: 12.5px; font-family: ui-monospace, monospace; display: flex; align-items: center; gap: 6px">{{ sug.name }}<span v-if="sug.official" style="font-size: 9px; padding: 1px 6px; border-radius: 999px; background: rgba(56,189,248,.16); color: var(--cp-cy)">official</span></div>
+                                <div v-if="sug.description" style="font-size: 11px; color: var(--cp-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ sug.description }}</div>
+                            </div>
+                            <span style="font-size: 10.5px; color: var(--cp-dim); display: flex; align-items: center; gap: 3px"><i class="ti ti-star" style="font-size: 12px" aria-hidden="true"></i>{{ sug.stars.toLocaleString() }}</span>
+                        </div>
+                    </div>
+                </div>
                 <label style="font-size: 11.5px; color: var(--cp-mut)">Port<input v-model.number="form.container_port" type="number" :style="field + ';width:100%;margin-top:5px'" /></label>
             </div>
             <div style="display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 10px; align-items: end; margin-top: 10px">

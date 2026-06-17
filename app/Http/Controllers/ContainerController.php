@@ -37,6 +37,34 @@ class ContainerController extends Controller
         return Inertia::render('Containers/Index', ['containers' => $containers]);
     }
 
+    /** Live Docker Hub image search (proxied server-side to avoid CORS). */
+    public function search(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['results' => []]);
+        }
+
+        try {
+            $res = \Illuminate\Support\Facades\Http::timeout(8)
+                ->get('https://hub.docker.com/v2/search/repositories/', ['query' => $q, 'page_size' => 8]);
+
+            $results = collect($res->json('results', []))
+                ->map(fn ($r) => [
+                    'name' => $r['repo_name'] ?? ($r['name'] ?? ''),
+                    'description' => \Illuminate\Support\Str::limit((string) ($r['short_description'] ?? ''), 70),
+                    'stars' => (int) ($r['star_count'] ?? 0),
+                    'official' => (bool) ($r['is_official'] ?? false),
+                ])
+                ->filter(fn ($r) => $r['name'] !== '')
+                ->values();
+
+            return response()->json(['results' => $results]);
+        } catch (\Throwable) {
+            return response()->json(['results' => []]);
+        }
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
