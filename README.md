@@ -30,15 +30,26 @@ stores DESIRED state                postfix/dovecot · systemd · cron · firewa
 
 **Deployment rule:** ConvoroCP runs on a **dedicated server it fully owns** — never co-installed on a box already running other production services. Control panels take over nginx, PHP, DNS, mail and the firewall; sharing a machine with hand-managed sites will break them.
 
+## Two audiences (it's a product you run to sell hosting)
+
+ConvoroCP is multi-tenant from the ground up, with role-scoped surfaces:
+
+- **Operator / admin** — the hosting provider. Manages customers, plans & pricing, server nodes, billing/MRR, tickets, and white-label branding. This is the "sell hosting" side.
+- **Client** — the customer who bought hosting. Sees only their own plan, sites, email, databases, files, usage and invoices. Never sees the server/system internals.
+
+Same design system + light/dark theme switcher (persisted per user) across both. Every capability is gated by role + plan limits.
+
 ## Roadmap (phases)
 
-- **P0 — Shell (done):** local scaffold, design system, dashboard reading mock data.
-- **P1 — Identity & servers:** login, teams, a server record + the privileged agent contract (socket protocol, operation allowlist).
-- **P2 — Sites:** create/list sites, nginx vhost templating, PHP-FPM pools, Let's Encrypt via the agent, git deploys.
-- **P3 — DNS & databases:** zone editor → agent, MariaDB/PostgreSQL provisioning + users, query console.
+- **P0 — Shell (done):** local scaffold, design system, **light/dark theme switcher**, dashboard.
+- **P1 — Identity, roles & servers:** auth, operator vs client roles (RBAC), teams, a server/node record + the privileged agent contract (socket protocol, operation allowlist).
+- **P2 — Sites & runtimes:** create/list sites, nginx vhost templating, **per-site PHP version** (multiple PHP-FPM versions installed side by side, switchable per site), Let's Encrypt via the agent, git deploys.
+- **P3 — DNS & databases:** zone editor → agent; **multi-engine databases — MySQL, MariaDB, PostgreSQL, SQLite** — provisioning + users + query console.
 - **P4 — Scheduler & daemons:** visual cron builder → systemd timers; supervised processes (autostart, restart policy, memory caps, log streaming).
-- **P5 — Webmail & mail admin:** mailbox/alias/quota management; the from-scratch Convoro-styled webmail client.
-- **P6 — Backups, security, monitoring, ⌘K palette, multi-tenant billing.**
+- **P5 — Terminal & files:** agent-mediated in-browser SSH/PTY terminal; web file manager + editor.
+- **P6 — Webmail & mail admin:** mailbox/alias/quota management; the from-scratch Convoro-styled webmail client.
+- **P7 — Selling hosting:** plans & pricing, client self-signup, Stripe billing/subscriptions, white-label branding, tickets.
+- **P8 — Backups, security, monitoring, ⌘K palette.**
 
 ## Develop
 

@@ -1,8 +1,22 @@
 <script setup>
+import { ref, onMounted } from 'vue';
+
 const props = defineProps({
     active: { type: String, default: 'dashboard' },
     server: { type: Object, default: () => ({ name: 'web-01', status: 'healthy', uptime: '41d' }) },
 });
+
+const light = ref(false);
+onMounted(() => {
+    light.value = document.documentElement.classList.contains('light');
+});
+function toggleTheme() {
+    light.value = !light.value;
+    document.documentElement.classList.toggle('light', light.value);
+    try {
+        localStorage.setItem('cp-theme', light.value ? 'light' : 'dark');
+    } catch (e) {}
+}
 
 const nav = [
     { key: 'dashboard', label: 'Dashboard', icon: 'ti-layout-dashboard', href: '/' },
@@ -29,7 +43,12 @@ const nav = [
                 :style="`display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;font-size:13px;text-decoration:none;${item.key === active ? 'background:rgba(91,91,214,.16);color:#fff' : 'color:var(--cp-mut)'}`">
                 <i class="ti" :class="item.icon" :style="`font-size:17px;${item.key === active ? 'color:var(--cp-vio)' : ''}`" aria-hidden="true"></i>{{ item.label }}
             </a>
-            <div style="margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid var(--cp-ln); border-radius: 10px; background: var(--cp-card)">
+            <button type="button" @click="toggleTheme" :aria-label="light ? 'Switch to dark mode' : 'Switch to light mode'"
+                style="margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--cp-ln); border-radius: 10px; background: var(--cp-card); color: var(--cp-mut); font-size: 12.5px; cursor: pointer; font-family: inherit">
+                <i class="ti" :class="light ? 'ti-moon' : 'ti-sun'" style="font-size: 16px" aria-hidden="true"></i>
+                {{ light ? 'Dark mode' : 'Light mode' }}
+            </button>
+            <div style="display: flex; align-items: center; gap: 9px; margin-top: 9px; padding: 9px; border: 1px solid var(--cp-ln); border-radius: 10px; background: var(--cp-card)">
                 <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--cp-grn)"></span>
                 <div style="line-height: 1.3">
                     <div style="font-size: 12px; font-weight: 500">{{ server.name }}</div>

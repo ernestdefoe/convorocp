@@ -42,10 +42,10 @@ const activity = [
             <div v-for="m in metrics" :key="m.label" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 14px; padding: 13px 14px">
                 <div style="display: flex; justify-content: space-between; align-items: center">
                     <span style="font-size: 12px; color: var(--cp-mut)">{{ m.label }}</span>
-                    <span style="font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--cp-mut)">{{ m.delta }}</span>
+                    <span style="font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--cp-soft); color: var(--cp-mut)">{{ m.delta }}</span>
                 </div>
                 <div style="font-size: 23px; font-weight: 600; margin: 4px 0 8px">{{ m.value }}<span style="font-size: 13px; color: var(--cp-dim); font-weight: 400">{{ m.unit }}</span></div>
-                <div style="height: 4px; border-radius: 4px; background: rgba(255,255,255,.07); overflow: hidden">
+                <div style="height: 4px; border-radius: 4px; background: var(--cp-soft); overflow: hidden">
                     <div :style="`width:46%;height:100%;background:${accent[m.label] || 'var(--cp-ind)'}`"></div>
                 </div>
             </div>
@@ -62,7 +62,7 @@ const activity = [
                 :style="`display:flex;align-items:center;gap:10px;padding:11px 15px;font-size:13px;${i < sites.length - 1 ? 'border-bottom:1px solid var(--cp-ln)' : ''}`">
                 <span :style="`width:7px;height:7px;border-radius:50%;background:${statusColor(s.status)}`"></span>
                 <span style="flex: 1; font-weight: 500">{{ s.name }}</span>
-                <span style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--cp-mut)">{{ s.runtime }}</span>
+                <span style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--cp-soft); color: var(--cp-mut)">{{ s.runtime }}</span>
                 <span style="color: var(--cp-dim); width: 72px; text-align: right">{{ s.visits }}</span>
                 <i class="ti ti-dots" style="color: var(--cp-dim)" aria-hidden="true"></i>
             </div>
