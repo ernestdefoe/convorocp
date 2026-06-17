@@ -14,6 +14,7 @@ use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
+use App\Http\Controllers\TerminalController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,10 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 
 // Public auto-deploy webhook (git host posts here on push; token-gated, CSRF-exempt).
 Route::post('/deploy-hook/{site}/{token}', [SiteController::class, 'webhook'])->name('sites.webhook');
+
+// nginx auth_request target gating the ttyd web-terminal proxy (operator-only).
+// Kept outside the 'auth' group so it returns a bare 401/403, never a redirect.
+Route::get('/terminal/check', [TerminalController::class, 'check'])->name('terminal.check');
 
 Route::middleware('auth')->get('/', function (Request $request) {
     if ($request->user()->isOperator()) {
@@ -124,6 +129,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
+
+    Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');
     Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');

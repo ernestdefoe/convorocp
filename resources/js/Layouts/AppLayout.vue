@@ -23,6 +23,7 @@ const navSets = {
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
         { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
         { key: 'services', label: 'Services', icon: 'ti-server-cog', href: '/services' },
+        { key: 'terminal', label: 'Terminal', icon: 'ti-terminal-2', href: '/terminal' },
         { key: 'security', label: 'Security', icon: 'ti-shield-lock', href: '/security' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
