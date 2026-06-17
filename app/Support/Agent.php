@@ -18,8 +18,9 @@ class Agent
     public const ALLOWED = [
         'site.create', 'site.delete', 'site.set_php_version', 'vhost.render',
         'php.fpm.pool.write', 'php.fpm.reload', 'cert.issue', 'cert.renew',
-        'db.create', 'db.user.create', 'cron.write', 'daemon.create',
-        'daemon.start', 'daemon.stop', 'daemon.restart',
+        'db.create', 'db.drop', 'db.user.create', 'db.user.grant',
+        'dns.zone.read', 'dns.zone.write', 'dns.reload',
+        'cron.write', 'daemon.create', 'daemon.start', 'daemon.stop', 'daemon.restart',
     ];
 
     public static function dispatch(string $op, array $args): AgentOperation

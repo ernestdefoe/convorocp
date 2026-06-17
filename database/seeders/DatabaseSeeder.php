@@ -37,5 +37,24 @@ class DatabaseSeeder extends Seeder
                 'status' => 'active',
             ]);
         }
+
+        foreach ([
+            ['name' => 'danielokafor', 'engine' => 'mariadb', 'db_user' => 'danielokafor_user'],
+            ['name' => 'shop_prod', 'engine' => 'pgsql', 'db_user' => 'shop_prod_user'],
+        ] as $db) {
+            \App\Models\Database::updateOrCreate(['name' => $db['name']], $db + ['user_id' => $client->id]);
+        }
+
+        foreach ([
+            ['type' => 'A', 'name' => '@', 'value' => '86.48.28.240', 'ttl' => 300],
+            ['type' => 'CNAME', 'name' => 'www', 'value' => 'danielokafor.com.', 'ttl' => 3600],
+            ['type' => 'MX', 'name' => '@', 'value' => '10 mail.danielokafor.com.', 'ttl' => 3600],
+            ['type' => 'TXT', 'name' => '@', 'value' => 'v=spf1 mx ~all', 'ttl' => 3600],
+        ] as $rec) {
+            \App\Models\DnsRecord::updateOrCreate(
+                ['domain' => 'danielokafor.com', 'type' => $rec['type'], 'name' => $rec['name']],
+                $rec + ['domain' => 'danielokafor.com', 'user_id' => $client->id],
+            );
+        }
     }
 }

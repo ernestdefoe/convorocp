@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DatabaseController;
+use App\Http\Controllers\DnsController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -49,4 +51,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
     Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
+
+    Route::get('/databases', [DatabaseController::class, 'index'])->name('databases.index');
+    Route::post('/databases', [DatabaseController::class, 'store'])->name('databases.store');
+    Route::delete('/databases/{database}', [DatabaseController::class, 'destroy'])->name('databases.destroy');
+
+    Route::get('/dns', [DnsController::class, 'index'])->name('dns.index');
+    Route::post('/dns', [DnsController::class, 'store'])->name('dns.store');
+    Route::delete('/dns/{record}', [DnsController::class, 'destroy'])->name('dns.destroy');
 });
