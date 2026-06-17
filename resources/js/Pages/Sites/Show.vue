@@ -40,6 +40,10 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
 <template>
     <AppLayout active="sites" :title="site.domain" subtitle="Site">
         <template #actions>
+            <Link :href="`/sites/${site.id}/files`"
+                style="font-size: 12px; color: var(--cp-mut); border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none">
+                <i class="ti ti-folder" style="font-size: 14px" aria-hidden="true"></i>Files
+            </Link>
             <a :href="`https://${site.domain}`" target="_blank" rel="noopener"
                 style="font-size: 12px; color: #fff; background: var(--cp-ind); border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; text-decoration: none">
                 <i class="ti ti-external-link" style="font-size: 14px" aria-hidden="true"></i>Visit

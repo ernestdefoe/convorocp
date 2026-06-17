@@ -6,6 +6,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\PhpController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SchedulerController;
@@ -71,6 +72,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');
     Route::patch('/sites/{site}/repo', [SiteController::class, 'updateRepo'])->name('sites.repo');
     Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->name('sites.deploy');
+    Route::get('/sites/{site}/files', [FileController::class, 'index'])->name('sites.files');
+    Route::post('/sites/{site}/files/save', [FileController::class, 'save'])->name('sites.files.save');
+    Route::post('/sites/{site}/files/upload', [FileController::class, 'upload'])->name('sites.files.upload');
+    Route::post('/sites/{site}/files/mkdir', [FileController::class, 'mkdir'])->name('sites.files.mkdir');
+    Route::delete('/sites/{site}/files', [FileController::class, 'destroy'])->name('sites.files.destroy');
     Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
 
     Route::get('/databases', [DatabaseController::class, 'index'])->name('databases.index');
