@@ -21,6 +21,12 @@ function newFolder() {
     if (name) router.post(`/sites/${props.site.id}/files/mkdir`, { path: props.path, name }, { preserveScroll: true });
 }
 const del = (p, name) => { if (confirm(`Delete ${name}?`)) router.delete(`/sites/${props.site.id}/files`, { data: { path: p }, preserveScroll: true }); };
+
+const chmodTarget = ref(null);
+const chmodForm = useForm({ path: '', mode: '' });
+function openChmod(e) { chmodTarget.value = e; chmodForm.path = e.path; chmodForm.mode = e.perms; }
+function applyChmod() { chmodForm.post(`/sites/${props.site.id}/files/chmod`, { preserveScroll: true, onSuccess: () => { chmodTarget.value = null; } }); }
+const presets = ['644', '755', '600', '700', '775', '666'];
 </script>
 
 <template>
@@ -46,7 +52,8 @@ const del = (p, name) => { if (confirm(`Delete ${name}?`)) router.delete(`/sites
             <div v-for="(e, i) in entries" :key="e.name" :style="`display:flex;align-items:center;gap:10px;padding:10px 15px;font-size:13px;${i < entries.length - 1 ? 'border-bottom:1px solid var(--cp-ln)' : ''}`">
                 <i class="ti" :class="e.type === 'dir' ? 'ti-folder' : 'ti-file'" :style="`font-size:16px;color:${e.type === 'dir' ? 'var(--cp-amb)' : 'var(--cp-dim)'}`" aria-hidden="true"></i>
                 <Link :href="url(e.path)" style="flex: 1; text-decoration: none; color: var(--cp-ink); font-weight: 500">{{ e.name }}</Link>
-                <span style="font-size: 11px; color: var(--cp-dim); width: 70px; text-align: right">{{ human(e.size) }}</span>
+                <span style="font-size: 11px; color: var(--cp-dim); width: 64px; text-align: right">{{ human(e.size) }}</span>
+                <button type="button" @click="openChmod(e)" title="Change permissions" style="font-family: ui-monospace, monospace; font-size: 11px; color: var(--cp-mut); background: var(--cp-card2); border: 1px solid var(--cp-ln); border-radius: 6px; padding: 2px 7px; cursor: pointer">{{ e.perms }}</button>
                 <button type="button" @click="del(e.path, e.name)" aria-label="Delete" style="border: 0; background: transparent; color: var(--cp-dim); cursor: pointer; padding: 0"><i class="ti ti-trash" style="font-size: 15px" aria-hidden="true"></i></button>
             </div>
             <div v-if="!entries.length" style="padding: 30px; text-align: center; color: var(--cp-dim); font-size: 13px">Empty folder</div>
@@ -62,6 +69,30 @@ const del = (p, name) => { if (confirm(`Delete ${name}?`)) router.delete(`/sites
             <textarea v-if="file.editable" v-model="edit.content" spellcheck="false"
                 style="width: 100%; box-sizing: border-box; min-height: 440px; border: 0; background: var(--cp-bg); color: var(--cp-ink); padding: 14px 16px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.6; resize: vertical; outline: none"></textarea>
             <div v-else style="padding: 40px; text-align: center; color: var(--cp-dim); font-size: 13px">File too large to edit in the browser ({{ human(file.size) }}).</div>
+        </div>
+
+        <div v-if="chmodTarget" @click.self="chmodTarget = null"
+            style="position: fixed; inset: 0; z-index: 50; background: rgba(6,8,16,.55); display: flex; align-items: center; justify-content: center; padding: 20px">
+            <div style="width: 360px; max-width: 100%; background: var(--cp-card); border: 1px solid var(--cp-ln2); border-radius: 14px; padding: 18px">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+                    <i class="ti ti-lock-cog" style="font-size: 17px; color: var(--cp-vio)" aria-hidden="true"></i>
+                    <span style="font-size: 14px; font-weight: 600; flex: 1">Permissions</span>
+                    <button type="button" @click="chmodTarget = null" style="border: 0; background: transparent; color: var(--cp-dim); cursor: pointer"><i class="ti ti-x" style="font-size: 16px" aria-hidden="true"></i></button>
+                </div>
+                <div style="font-size: 12px; color: var(--cp-dim); font-family: ui-monospace, monospace; margin-bottom: 14px; word-break: break-all">{{ chmodTarget.name }}</div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
+                    <input v-model="chmodForm.mode" maxlength="3" style="width: 88px; box-sizing: border-box; background: var(--cp-card2); border: 1px solid var(--cp-ln); border-radius: 9px; color: var(--cp-ink); padding: 9px 11px; font-size: 16px; font-family: ui-monospace, monospace; text-align: center; letter-spacing: 3px" />
+                    <span style="font-size: 11.5px; color: var(--cp-dim)">octal — owner / group / others</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px">
+                    <button v-for="p in presets" :key="p" type="button" @click="chmodForm.mode = p"
+                        :style="`font-family:ui-monospace,monospace;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--cp-ln);${chmodForm.mode === p ? 'background:var(--cp-ind);color:#fff;border-color:transparent' : 'background:var(--cp-card2);color:var(--cp-mut)'}`">{{ p }}</button>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px">
+                    <button type="button" @click="chmodTarget = null" style="font-size: 12.5px; color: var(--cp-mut); background: transparent; border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-family: inherit">Cancel</button>
+                    <button type="button" @click="applyChmod" :disabled="chmodForm.processing" style="font-size: 12.5px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 500; cursor: pointer; font-family: inherit">Apply</button>
+                </div>
+            </div>
         </div>
     </AppLayout>
 </template>

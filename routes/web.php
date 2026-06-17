@@ -76,6 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/sites/{site}/files/save', [FileController::class, 'save'])->name('sites.files.save');
     Route::post('/sites/{site}/files/upload', [FileController::class, 'upload'])->name('sites.files.upload');
     Route::post('/sites/{site}/files/mkdir', [FileController::class, 'mkdir'])->name('sites.files.mkdir');
+    Route::post('/sites/{site}/files/chmod', [FileController::class, 'chmod'])->name('sites.files.chmod');
     Route::delete('/sites/{site}/files', [FileController::class, 'destroy'])->name('sites.files.destroy');
     Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
 

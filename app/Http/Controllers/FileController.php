@@ -87,6 +87,7 @@ class FileController extends Controller
                     'name' => $n,
                     'type' => $isDir ? 'dir' : 'file',
                     'size' => $isDir ? null : @filesize($p),
+                    'perms' => substr(sprintf('%o', @fileperms($p) ?: 0), -3),
                     'path' => ltrim(trim($rel, '/').'/'.$n, '/'),
                 ];
             })
@@ -129,6 +130,19 @@ class FileController extends Controller
         if (! is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
+
+        return back();
+    }
+
+    public function chmod(Request $request, Site $site)
+    {
+        $this->authorizeSite($request, $site);
+        $data = $request->validate([
+            'path' => ['required', 'string'],
+            'mode' => ['required', 'regex:/^0?[0-7]{3}$/'],
+        ]);
+        $target = $this->safe($this->base($site), $data['path']);
+        @chmod($target, octdec(substr($data['mode'], -3)));
 
         return back();
     }
