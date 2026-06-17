@@ -16,7 +16,8 @@ class Agent
 {
     /** Operations the agent will accept. Anything else is rejected here. */
     public const ALLOWED = [
-        'site.create', 'site.delete', 'site.set_php_version', 'site.set_php_settings', 'vhost.render',
+        'site.create', 'site.delete', 'site.set_php_version', 'site.set_php_settings',
+        'site.deploy', 'vhost.render',
         'php.fpm.pool.write', 'php.fpm.reload', 'php.install', 'php.uninstall',
         'cert.issue', 'cert.renew',
         'db.create', 'db.drop', 'db.user.create', 'db.user.grant',

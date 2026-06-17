@@ -9,8 +9,18 @@ class Site extends Model
 {
     protected $fillable = [
         'user_id', 'domain', 'runtime', 'php_version', 'php_settings', 'status',
-        'ssl_status', 'repo', 'branch', 'auto_deploy',
+        'ssl_status', 'repo', 'branch', 'auto_deploy', 'deploy_token',
     ];
+
+    /** The auto-deploy webhook token, generated on first access. */
+    public function deployToken(): string
+    {
+        if (! $this->deploy_token) {
+            $this->forceFill(['deploy_token' => \Illuminate\Support\Str::random(40)])->save();
+        }
+
+        return $this->deploy_token;
+    }
 
     protected $casts = ['auto_deploy' => 'boolean', 'php_settings' => 'array'];
 

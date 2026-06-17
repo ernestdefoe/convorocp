@@ -23,6 +23,9 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
+// Public auto-deploy webhook (git host posts here on push; token-gated, CSRF-exempt).
+Route::post('/deploy-hook/{site}/{token}', [SiteController::class, 'webhook'])->name('sites.webhook');
+
 Route::middleware('auth')->get('/', function (Request $request) {
     if ($request->user()->isOperator()) {
         $clients = \App\Models\User::where('role', 'client')->with('plan')->withCount('sites')->get();
@@ -65,6 +68,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
     Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');
+    Route::patch('/sites/{site}/repo', [SiteController::class, 'updateRepo'])->name('sites.repo');
+    Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->name('sites.deploy');
     Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
 
     Route::get('/databases', [DatabaseController::class, 'index'])->name('databases.index');

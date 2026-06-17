@@ -19,6 +19,7 @@ class AgentHandlers
         'site.create' => 'siteCreate',
         'site.set_php_version' => 'siteSetPhpVersion',
         'site.set_php_settings' => 'siteSetPhpSettings',
+        'site.deploy' => 'siteDeploy',
         'site.delete' => 'siteDelete',
         'cert.issue' => 'certIssue',
         'php.install' => 'phpInstall',
@@ -145,6 +146,38 @@ class AgentHandlers
         self::run(['systemctl', 'reload', "php{$php}-fpm"]);
 
         return ['applied' => true, 'domain' => $domain, 'php' => $php];
+    }
+
+    private static function siteDeploy(array $args): array
+    {
+        $domain = self::domain($args);
+        $repo = (string) ($args['repo'] ?? '');
+        if (! preg_match('#^https://[a-z0-9./_\-]+$#i', $repo)) {
+            throw new \RuntimeException('Only https:// git repositories are supported.');
+        }
+        $branch = preg_match('/^[a-z0-9._\-\/]+$/i', (string) ($args['branch'] ?? 'main')) ? $args['branch'] : 'main';
+        $root = "/var/www/sites/{$domain}/public";
+
+        if (is_dir("{$root}/.git")) {
+            self::run(['git', '-C', $root, 'remote', 'set-url', 'origin', $repo]);
+            self::run(['git', '-C', $root, 'fetch', '--depth', '1', 'origin', $branch], 180);
+            $r = self::run(['git', '-C', $root, 'reset', '--hard', "origin/{$branch}"], 120);
+        } else {
+            self::run(['rm', '-rf', $root]);
+            $r = self::run(['git', 'clone', '--depth', '1', '--branch', $branch, $repo, $root], 180);
+        }
+        if (! $r->successful()) {
+            throw new \RuntimeException('git failed: '.trim($r->errorOutput()));
+        }
+
+        if (is_file("{$root}/composer.json")) {
+            self::run(['composer', 'install', '--no-dev', '--no-interaction', '--optimize-autoloader', '-d', $root], 300,
+                ['COMPOSER_HOME' => '/root/.composer', 'COMPOSER_ALLOW_SUPERUSER' => '1']);
+        }
+
+        self::run(['chown', '-R', 'www-data:www-data', "/var/www/sites/{$domain}"]);
+
+        return ['applied' => true, 'domain' => $domain, 'repo' => $repo, 'branch' => $branch];
     }
 
     private static function siteDelete(array $args): array
@@ -396,6 +429,7 @@ class AgentHandlers
             $op === 'site.delete' => "remove vhost + pool + webroot for {$d}",
             $op === 'site.set_php_version' => "point {$d} FPM pool at PHP ".($args['php'] ?? '?'),
             $op === 'site.set_php_settings' => "apply PHP/INI settings to {$d}",
+            $op === 'site.deploy' => "git deploy {$d} from ".($args['repo'] ?? 'repo'),
             str_starts_with($op, 'cert.') => 'ACME '.substr($op, 5)." certificate for {$d}",
             str_starts_with($op, 'db.') => "{$op} on the ".($args['engine'] ?? '?')." engine ({$d})",
             str_starts_with($op, 'dns.') => "write + reload the zone for {$d}",

@@ -25,6 +25,10 @@ function toggleFn(fn) {
     const i = ini.disable_functions.indexOf(fn);
     if (i === -1) ini.disable_functions.push(fn); else ini.disable_functions.splice(i, 1);
 }
+
+const repo = useForm({ repo: props.site.repo || '', branch: props.site.branch || 'main', auto_deploy: !!props.site.auto_deploy });
+function saveRepo() { repo.patch(`/sites/${props.site.id}/repo`, { preserveScroll: true }); }
+function deployNow() { router.post(`/sites/${props.site.id}/deploy`, {}, { preserveScroll: true }); }
 function destroy() {
     if (confirm(`Delete ${props.site.domain}? This cannot be undone.`)) {
         router.delete(`/sites/${props.site.id}`);
@@ -66,6 +70,24 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 9px"><span style="color: var(--cp-mut)">Status</span><span style="text-transform: capitalize">{{ site.status }}</span></div>
                 <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--cp-mut)">Auto-deploy</span><span>{{ site.auto_deploy ? 'On' : 'Off' }}</span></div>
+            </div>
+        </div>
+
+        <div style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 14px 16px; margin-bottom: 14px">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px">
+                <i class="ti ti-git-branch" style="color: var(--cp-vio); font-size: 17px" aria-hidden="true"></i>
+                <span style="font-size: 13px; font-weight: 600; flex: 1">Deployment</span>
+                <button type="button" @click="saveRepo" :disabled="repo.processing" style="font-size: 12px; color: var(--cp-mut); background: transparent; border: 1px solid var(--cp-ln); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-family: inherit">Save</button>
+                <button type="button" @click="deployNow" style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 6px 14px; font-weight: 500; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 5px"><i class="ti ti-rocket" style="font-size: 14px" aria-hidden="true"></i>Deploy now</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px">
+                <label style="font-size: 11.5px; color: var(--cp-mut)">Git repository (https)<input v-model="repo.repo" :style="field + ';width:100%;margin-top:5px'" placeholder="https://github.com/you/app" /></label>
+                <label style="font-size: 11.5px; color: var(--cp-mut)">Branch<input v-model="repo.branch" :style="field + ';width:100%;margin-top:5px'" /></label>
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--cp-mut); margin-top: 13px"><input type="checkbox" v-model="repo.auto_deploy" /> Auto-deploy on push (webhook)</label>
+            <div v-if="repo.auto_deploy" style="margin-top: 10px; font-size: 11px; color: var(--cp-dim)">
+                Webhook URL <span style="color: var(--cp-mut)">— add to your git host's push events:</span>
+                <div style="font-family: ui-monospace, monospace; background: var(--cp-card2); border: 1px solid var(--cp-ln); border-radius: 8px; padding: 8px 10px; margin-top: 5px; word-break: break-all; color: var(--cp-ink)">{{ site.deploy_webhook }}</div>
             </div>
         </div>
 

@@ -88,6 +88,7 @@ class SiteController extends Controller
                 'branch' => $site->branch,
                 'auto_deploy' => $site->auto_deploy,
                 'php_settings' => $site->phpSettings(),
+                'deploy_webhook' => url('/deploy-hook/'.$site->id.'/'.$site->deployToken()),
             ],
             'phpVersions' => \App\Models\PhpRuntime::installed(),
             'disableableFunctions' => Site::DISABLEABLE_FUNCTIONS,
@@ -135,6 +136,47 @@ class SiteController extends Controller
         }
 
         return back();
+    }
+
+    public function updateRepo(Request $request, Site $site)
+    {
+        $this->authorizeSite($request, $site);
+        $data = $request->validate([
+            'repo' => ['nullable', 'regex:#^https://[\w./-]+$#i', 'max:255'],
+            'branch' => ['required', 'string', 'max:120', 'regex:#^[\w./-]+$#'],
+            'auto_deploy' => ['boolean'],
+        ]);
+        $site->update([
+            'repo' => $data['repo'] ?: null,
+            'branch' => $data['branch'],
+            'auto_deploy' => $request->boolean('auto_deploy'),
+        ]);
+
+        return back();
+    }
+
+    public function deploy(Request $request, Site $site)
+    {
+        $this->authorizeSite($request, $site);
+        if (! $site->repo) {
+            return back()->withErrors(['repo' => 'Set a git repository first.']);
+        }
+        $site->update(['status' => 'deploying']);
+        Agent::dispatch('site.deploy', ['domain' => $site->domain, 'repo' => $site->repo, 'branch' => $site->branch]);
+
+        return back();
+    }
+
+    public function webhook(Request $request, Site $site, string $token)
+    {
+        abort_unless($site->deploy_token && hash_equals($site->deploy_token, $token), 404);
+        if ($site->auto_deploy && $site->repo) {
+            Agent::dispatch('site.deploy', ['domain' => $site->domain, 'repo' => $site->repo, 'branch' => $site->branch]);
+
+            return response()->json(['ok' => true, 'queued' => true]);
+        }
+
+        return response()->json(['ok' => true, 'queued' => false]);
     }
 
     public function destroy(Request $request, Site $site)
