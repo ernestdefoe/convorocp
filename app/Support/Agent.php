@@ -25,7 +25,7 @@ class Agent
         'cron.write', 'cron.delete', 'cron.run_now',
         'daemon.create', 'daemon.delete', 'daemon.start', 'daemon.stop', 'daemon.restart',
         'container.run', 'container.start', 'container.stop', 'container.remove',
-        'backup.run', 'backup.delete',
+        'backup.run', 'backup.restore', 'backup.delete',
         'service.control',
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
     ];

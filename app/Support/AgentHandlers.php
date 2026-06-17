@@ -32,6 +32,7 @@ class AgentHandlers
         'container.stop' => 'containerStop',
         'container.remove' => 'containerRemove',
         'backup.run' => 'backupRun',
+        'backup.restore' => 'backupRestore',
         'service.control' => 'serviceControl',
         'firewall.allow' => 'firewallRule',
         'firewall.remove' => 'firewallRemove',
@@ -480,6 +481,40 @@ class AgentHandlers
         return ['applied' => true, 'kind' => $kind, 'target' => $target];
     }
 
+    private static function backupRestore(array $args): array
+    {
+        $kind = ($args['kind'] ?? '') === 'database' ? 'database' : 'site';
+        $target = (string) ($args['target'] ?? '');
+        $file = '/var/backups/convorocp/'.basename((string) ($args['filename'] ?? ''));
+        if (! is_file($file)) {
+            throw new \RuntimeException('Backup file not found.');
+        }
+
+        if ($kind === 'site') {
+            if (! preg_match('/^[a-z0-9.-]+$/i', $target) || str_contains($target, '..')) {
+                throw new \RuntimeException('Invalid restore target.');
+            }
+            $r = self::run(['tar', '-xzf', $file, '-C', '/var/www/sites'], 600);
+            if (! $r->successful()) {
+                throw new \RuntimeException(trim($r->errorOutput()));
+            }
+            self::run(['chown', '-R', 'www-data:www-data', "/var/www/sites/{$target}"]);
+        } else {
+            $engine = self::dbEngine($args);
+            $name = self::ident($target);
+            $f = escapeshellarg($file);
+            $cmd = $engine === 'pgsql'
+                ? "gunzip -c {$f} | sudo -u postgres psql ".escapeshellarg($name)
+                : "gunzip -c {$f} | mysql ".escapeshellarg($name);
+            $r = self::run(['bash', '-c', $cmd], 600);
+            if (! $r->successful()) {
+                throw new \RuntimeException(trim($r->errorOutput()));
+            }
+        }
+
+        return ['applied' => true, 'restored' => $kind, 'target' => $target];
+    }
+
     private static function markBackup(int $id, string $status, ?string $filename, int $size): void
     {
         if ($id && class_exists(\App\Models\Backup::class)) {
@@ -662,6 +697,7 @@ class AgentHandlers
             str_starts_with($op, 'daemon.') => "write/control systemd unit for daemon {$d}",
             str_starts_with($op, 'container.') => substr($op, 10)." docker container ".($args['name'] ?? ''),
             $op === 'backup.run' => "back up ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
+            $op === 'backup.restore' => "restore ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
             str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',

@@ -120,6 +120,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
     Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
+    Route::post('/backups/{backup}/restore', [BackupController::class, 'restore'])->name('backups.restore');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
 
     Route::get('/security', [SecurityController::class, 'index'])->name('security.index');

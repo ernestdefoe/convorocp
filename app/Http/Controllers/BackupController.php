@@ -84,6 +84,22 @@ class BackupController extends Controller
         return response()->download($path);
     }
 
+    public function restore(Request $request, Backup $backup)
+    {
+        abort_unless($request->user()->isOperator() || $backup->user_id === $request->user()->id, 403);
+        abort_unless($backup->status === 'done' && $backup->filename, 422);
+        abort_unless(is_file('/var/backups/convorocp/'.basename($backup->filename)), 404);
+
+        Agent::dispatch('backup.restore', [
+            'kind' => $backup->kind,
+            'target' => $backup->target,
+            'engine' => $backup->engine,
+            'filename' => basename($backup->filename),
+        ]);
+
+        return redirect('/backups');
+    }
+
     public function destroy(Request $request, Backup $backup)
     {
         abort_unless($request->user()->isOperator() || $backup->user_id === $request->user()->id, 403);

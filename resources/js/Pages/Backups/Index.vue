@@ -13,6 +13,7 @@ function create() {
     form.post('/backups', { onSuccess: () => { showForm.value = false; form.reset(); } });
 }
 const destroy = (b) => { if (confirm('Delete this backup?')) router.delete(`/backups/${b.id}`); };
+const restore = (b) => { if (confirm(`Restore ${b.kind} "${b.target}" from this backup? This overwrites the current ${b.kind === 'site' ? 'files' : 'database'}.`)) router.post(`/backups/${b.id}/restore`); };
 const human = (n) => (n == null ? '—' : n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
 const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid var(--cp-ln);border-radius:9px;color:var(--cp-ink);padding:9px 11px;font-size:13px;font-family:inherit';
 </script>
@@ -42,7 +43,10 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 </div>
                 <span style="font-size: 11.5px; color: var(--cp-dim); width: 70px; text-align: right">{{ human(b.size) }}</span>
                 <span v-if="b.status !== 'done'" :style="`font-size:10.5px;font-weight:500;padding:2px 9px;border-radius:999px;${b.status === 'failed' ? 'background:rgba(248,113,113,.16);color:var(--cp-red)' : 'background:rgba(251,191,36,.16);color:var(--cp-amb)'}`">{{ b.status === 'pending' ? 'running…' : b.status }}</span>
-                <a v-else :href="`/backups/${b.id}/download`" aria-label="Download" style="color: var(--cp-mut); text-decoration: none"><i class="ti ti-download" style="font-size: 16px" aria-hidden="true"></i></a>
+                <template v-else>
+                    <button type="button" @click="restore(b)" aria-label="Restore" title="Restore" style="border: 0; background: transparent; color: var(--cp-mut); cursor: pointer; padding: 0"><i class="ti ti-history" style="font-size: 16px" aria-hidden="true"></i></button>
+                    <a :href="`/backups/${b.id}/download`" aria-label="Download" style="color: var(--cp-mut); text-decoration: none"><i class="ti ti-download" style="font-size: 16px" aria-hidden="true"></i></a>
+                </template>
                 <button type="button" @click="destroy(b)" aria-label="Delete" style="border: 0; background: transparent; color: var(--cp-dim); cursor: pointer; padding: 0"><i class="ti ti-trash" style="font-size: 15px" aria-hidden="true"></i></button>
             </div>
         </div>
