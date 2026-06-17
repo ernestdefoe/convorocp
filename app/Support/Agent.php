@@ -20,7 +20,8 @@ class Agent
         'php.fpm.pool.write', 'php.fpm.reload', 'cert.issue', 'cert.renew',
         'db.create', 'db.drop', 'db.user.create', 'db.user.grant',
         'dns.zone.read', 'dns.zone.write', 'dns.reload',
-        'cron.write', 'daemon.create', 'daemon.start', 'daemon.stop', 'daemon.restart',
+        'cron.write', 'cron.delete', 'cron.run_now',
+        'daemon.create', 'daemon.delete', 'daemon.start', 'daemon.stop', 'daemon.restart',
     ];
 
     public static function dispatch(string $op, array $args): AgentOperation

@@ -56,5 +56,19 @@ class DatabaseSeeder extends Seeder
                 $rec + ['domain' => 'danielokafor.com', 'user_id' => $client->id],
             );
         }
+
+        foreach ([
+            ['name' => 'Nightly database backup', 'command' => 'php artisan backup:run', 'cron' => '0 3 * * *'],
+            ['name' => 'Prune old logs', 'command' => 'php artisan log:prune', 'cron' => '0 4 * * 0'],
+        ] as $task) {
+            \App\Models\ScheduledTask::updateOrCreate(['name' => $task['name'], 'user_id' => $client->id], $task + ['user_id' => $client->id]);
+        }
+
+        foreach ([
+            ['name' => 'queue-worker', 'command' => 'php artisan queue:work', 'status' => 'running'],
+            ['name' => 'reverb', 'command' => 'php artisan reverb:start', 'status' => 'running'],
+        ] as $d) {
+            \App\Models\Daemon::updateOrCreate(['name' => $d['name'], 'user_id' => $client->id], $d + ['user_id' => $client->id, 'restart_policy' => 'always']);
+        }
     }
 }

@@ -17,6 +17,8 @@ const navSets = {
         { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
+        { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
+        { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '#' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
@@ -37,8 +39,8 @@ const navSets = {
         { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
-        { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '#' },
-        { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '#' },
+        { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
+        { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
     ],
 };
 

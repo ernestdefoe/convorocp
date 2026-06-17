@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
+use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -59,4 +61,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/dns', [DnsController::class, 'index'])->name('dns.index');
     Route::post('/dns', [DnsController::class, 'store'])->name('dns.store');
     Route::delete('/dns/{record}', [DnsController::class, 'destroy'])->name('dns.destroy');
+
+    Route::get('/scheduler', [SchedulerController::class, 'index'])->name('scheduler.index');
+    Route::post('/scheduler', [SchedulerController::class, 'store'])->name('scheduler.store');
+    Route::patch('/scheduler/{task}/toggle', [SchedulerController::class, 'toggle'])->name('scheduler.toggle');
+    Route::post('/scheduler/{task}/run', [SchedulerController::class, 'run'])->name('scheduler.run');
+    Route::delete('/scheduler/{task}', [SchedulerController::class, 'destroy'])->name('scheduler.destroy');
+
+    Route::get('/daemons', [DaemonController::class, 'index'])->name('daemons.index');
+    Route::post('/daemons', [DaemonController::class, 'store'])->name('daemons.store');
+    Route::post('/daemons/{daemon}/{action}', [DaemonController::class, 'action'])->name('daemons.action');
+    Route::delete('/daemons/{daemon}', [DaemonController::class, 'destroy'])->name('daemons.destroy');
 });
