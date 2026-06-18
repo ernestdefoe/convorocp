@@ -20,6 +20,9 @@ function install() {
 const remove = (i) => { if (confirm('Remove this install record? (Files on the site are left in place.)')) router.delete(`/apps/${i.id}`, { preserveScroll: true }); };
 
 const statusTone = { done: 'var(--cp-grn)', failed: 'var(--cp-red)', pending: 'var(--cp-amb)' };
+// Per-app accent so each card reads at a glance.
+const accents = { wordpress: '#3858e9', convoro: '#5b5bd6', flarum: '#e8590c', phpmyadmin: '#f59e0b', static: '#0891b2' };
+const accent = (k) => accents[k] || '#5b5bd6';
 const field = 'box-sizing:border-box;width:100%;background:var(--cp-card2);border:1px solid var(--cp-ln);border-radius:9px;color:var(--cp-ink);padding:9px 11px;font-size:13px;font-family:inherit';
 </script>
 
@@ -30,17 +33,15 @@ const field = 'box-sizing:border-box;width:100%;background:var(--cp-card2);borde
         </div>
 
         <!-- catalog -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 22px">
-            <div v-for="a in catalog" :key="a.key"
-                :style="`position:relative;background:var(--cp-card);border:1px solid ${a.featured ? 'var(--cp-ind)' : 'var(--cp-ln)'};border-radius:13px;padding:16px`">
-                <span v-if="a.featured" style="position: absolute; top: 12px; right: 12px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; color: #fff; background: var(--cp-ind); padding: 2px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px"><i class="ti ti-star-filled" style="font-size: 10px" aria-hidden="true"></i>FEATURED</span>
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 9px">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(91,91,214,.14); display: flex; align-items: center; justify-content: center"><i class="ti" :class="a.icon" style="font-size: 20px; color: var(--cp-vio)" aria-hidden="true"></i></div>
-                    <div style="font-size: 14px; font-weight: 600">{{ a.name }}</div>
-                </div>
-                <div style="font-size: 11.5px; color: var(--cp-dim); line-height: 1.45; min-height: 34px">{{ a.desc }}</div>
-                <button type="button" :disabled="!sites.length" @click="choose(a)"
-                    :style="`margin-top:12px;width:100%;font-size:12.5px;color:#fff;background:var(--cp-ind);border:0;border-radius:9px;padding:8px;cursor:pointer;font-family:inherit;${!sites.length ? 'opacity:.5;cursor:not-allowed' : ''}`">Install</button>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 14px; margin-bottom: 26px">
+            <div v-for="a in catalog" :key="a.key" class="app-card" :class="{ featured: a.featured }" :style="`--acc:${accent(a.key)}`">
+                <span v-if="a.featured" class="app-badge"><i class="ti ti-star-filled" style="font-size: 10px" aria-hidden="true"></i>FEATURED</span>
+                <div class="app-icon"><i class="ti" :class="a.icon" aria-hidden="true"></i></div>
+                <div class="app-name">{{ a.name }}</div>
+                <div class="app-desc">{{ a.desc }}</div>
+                <button type="button" class="app-btn" :disabled="!sites.length" @click="choose(a)">
+                    <i class="ti ti-download" style="font-size: 14px" aria-hidden="true"></i>Install
+                </button>
             </div>
         </div>
 
@@ -61,8 +62,8 @@ const field = 'box-sizing:border-box;width:100%;background:var(--cp-card2);borde
         <!-- install modal -->
         <div v-if="picked" @click.self="picked = null" style="position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 50">
             <form @submit.prevent="install" style="background: var(--cp-side); border: 1px solid var(--cp-ln); border-radius: 14px; padding: 20px; width: 420px; max-width: 92vw">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
-                    <i class="ti" :class="picked.icon" style="font-size: 22px; color: var(--cp-vio)" aria-hidden="true"></i>
+                <div style="display: flex; align-items: center; gap: 11px; margin-bottom: 14px">
+                    <div :style="`width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:${accent(picked.key)}1f`"><i class="ti" :class="picked.icon" :style="`font-size:22px;color:${accent(picked.key)}`" aria-hidden="true"></i></div>
                     <div style="font-size: 15px; font-weight: 600">Install {{ picked.name }}</div>
                 </div>
                 <label style="font-size: 11.5px; color: var(--cp-mut)">Install onto site
@@ -78,3 +79,94 @@ const field = 'box-sizing:border-box;width:100%;background:var(--cp-card2);borde
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.app-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--cp-card);
+    border: 1px solid var(--cp-ln);
+    border-radius: 15px;
+    padding: 18px;
+    transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease;
+}
+.app-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--acc);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+}
+.app-card.featured {
+    border-color: color-mix(in srgb, var(--acc) 55%, var(--cp-ln));
+    background:
+        radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--acc) 14%, transparent), transparent 60%),
+        var(--cp-card);
+}
+.app-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--acc) 16%, transparent);
+    margin-bottom: 13px;
+}
+.app-icon .ti {
+    font-size: 24px;
+    color: var(--acc);
+}
+.app-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+.app-desc {
+    font-size: 12px;
+    color: var(--cp-dim);
+    line-height: 1.5;
+    margin-top: 4px;
+    flex: 1;
+}
+.app-btn {
+    margin-top: 16px;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--acc);
+    background: color-mix(in srgb, var(--acc) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--acc) 35%, transparent);
+    border-radius: 10px;
+    padding: 9px;
+    cursor: pointer;
+    transition: background .14s ease, color .14s ease;
+}
+.app-btn:hover:not(:disabled) {
+    background: var(--acc);
+    color: #fff;
+}
+.app-btn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+.app-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #fff;
+    background: var(--acc);
+    padding: 3px 8px;
+    border-radius: 999px;
+}
+</style>
