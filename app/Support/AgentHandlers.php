@@ -41,6 +41,9 @@ class AgentHandlers
         'firewall.remove' => 'firewallRemove',
         'firewall.enable' => 'firewallEnable',
         'firewall.disable' => 'firewallDisable',
+        'fail2ban.install' => 'fail2banInstall',
+        'fail2ban.unban' => 'fail2banUnban',
+        'fail2ban.ban' => 'fail2banBan',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -407,6 +410,74 @@ class AgentHandlers
         $action = in_array(($args['action'] ?? ''), ['allow', 'deny'], true) ? $args['action'] : 'allow';
 
         return [$port, $proto, $action];
+    }
+
+    // ---- fail2ban -------------------------------------------------------
+
+    private static function fail2banInstall(array $args): array
+    {
+        self::run(['bash', '-c', 'DEBIAN_FRONTEND=noninteractive apt-get install -y -q fail2ban'], 600);
+
+        // Protect SSH; never ban loopback. Operators can tune later.
+        file_put_contents('/etc/fail2ban/jail.local', <<<'CONF'
+            [DEFAULT]
+            bantime = 1h
+            findtime = 10m
+            maxretry = 5
+            ignoreip = 127.0.0.1/8 ::1
+
+            [sshd]
+            enabled = true
+            CONF);
+
+        // Read-only status access for the web tier (www-data). Scoped to the
+        // `status` subcommand so the panel can list jails/bans but not ban/stop.
+        $sudoers = "/etc/sudoers.d/convorocp-fail2ban";
+        file_put_contents($sudoers, "www-data ALL=(root) NOPASSWD: /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *\n");
+        self::run(['chmod', '440', $sudoers]);
+        if (! self::run(['visudo', '-cf', $sudoers])->successful()) {
+            @unlink($sudoers); // never leave a broken sudoers file in place
+        }
+
+        self::run(['systemctl', 'enable', 'fail2ban']);
+        self::run(['systemctl', 'restart', 'fail2ban']);
+
+        if (class_exists(\App\Support\Setting::class)) {
+            \App\Support\Setting::set('fail2ban.installed', true);
+        }
+
+        return ['applied' => true, 'installed' => true];
+    }
+
+    private static function fail2banUnban(array $args): array
+    {
+        [$jail, $ip] = self::f2bArgs($args);
+        self::run(['fail2ban-client', 'set', $jail, 'unbanip', $ip]);
+
+        return ['applied' => true, 'unbanned' => $ip];
+    }
+
+    private static function fail2banBan(array $args): array
+    {
+        [$jail, $ip] = self::f2bArgs($args);
+        self::run(['fail2ban-client', 'set', $jail, 'banip', $ip]);
+
+        return ['applied' => true, 'banned' => $ip];
+    }
+
+    /** @return array{0:string,1:string} jail, ip */
+    private static function f2bArgs(array $args): array
+    {
+        $jail = (string) ($args['jail'] ?? '');
+        $ip = (string) ($args['ip'] ?? '');
+        if (! preg_match('/^[\w.-]{1,40}$/', $jail)) {
+            throw new \RuntimeException('Invalid jail.');
+        }
+        if (! filter_var($ip, FILTER_VALIDATE_IP)) {
+            throw new \RuntimeException('Invalid IP.');
+        }
+
+        return [$jail, $ip];
     }
 
     // ---- Mail (Postfix + Dovecot) --------------------------------------
@@ -859,6 +930,8 @@ class AgentHandlers
             $op === 'panel.update' => "update ConvoroCP to ".($args['tag'] ?? ''),
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
             str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
+            $op === 'fail2ban.install' => 'install + configure fail2ban',
+            str_starts_with($op, 'fail2ban.') => 'fail2ban '.substr($op, 9).' '.($args['ip'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
             $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
             default => "apply {$op}",

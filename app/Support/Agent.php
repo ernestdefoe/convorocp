@@ -29,6 +29,7 @@ class Agent
         'mail.account_create', 'mail.account_delete',
         'service.control',
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
+        'fail2ban.install', 'fail2ban.unban', 'fail2ban.ban',
         'panel.update',
     ];
 

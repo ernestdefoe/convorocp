@@ -139,6 +139,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/security/rules', [SecurityController::class, 'addRule'])->name('security.rules.add');
     Route::delete('/security/rules/{rule}', [SecurityController::class, 'removeRule'])->name('security.rules.remove');
     Route::post('/security/toggle', [SecurityController::class, 'toggle'])->name('security.toggle');
+    Route::post('/security/fail2ban/install', [SecurityController::class, 'installFail2ban'])->name('security.fail2ban.install');
+    Route::post('/security/fail2ban/{action}', [SecurityController::class, 'fail2banAction'])->name('security.fail2ban.action');
 
     Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');

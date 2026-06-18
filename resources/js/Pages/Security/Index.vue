@@ -3,13 +3,15 @@ import { ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
-defineProps({ rules: Array, enabled: Boolean });
+defineProps({ rules: Array, enabled: Boolean, fail2ban: Object });
 
 const showForm = ref(false);
 const form = useForm({ port: 8080, proto: 'tcp', action: 'allow', note: '' });
 function add() { form.post('/security/rules', { onSuccess: () => { showForm.value = false; form.reset(); } }); }
 const remove = (r) => { if (confirm(`Remove rule ${r.action} ${r.port}/${r.proto}?`)) router.delete(`/security/rules/${r.id}`); };
 const toggle = () => router.post('/security/toggle', {}, { preserveScroll: true });
+const installF2b = () => router.post('/security/fail2ban/install', {}, { preserveScroll: true });
+const unban = (jail, ip) => { if (confirm(`Unban ${ip} from ${jail}?`)) router.post('/security/fail2ban/unban', { jail, ip }, { preserveScroll: true }); };
 const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid var(--cp-ln);border-radius:9px;color:var(--cp-ink);padding:9px 11px;font-size:13px;font-family:inherit';
 </script>
 
@@ -47,6 +49,34 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 <span style="font-family: ui-monospace, monospace; font-weight: 500">{{ r.port }}/{{ r.proto }}</span>
                 <span style="flex: 1; font-size: 11.5px; color: var(--cp-dim)">{{ r.note }}</span>
                 <button type="button" @click="remove(r)" aria-label="Remove" style="border: 0; background: transparent; color: var(--cp-dim); cursor: pointer; padding: 0"><i class="ti ti-trash" style="font-size: 15px" aria-hidden="true"></i></button>
+            </div>
+        </div>
+
+        <!-- fail2ban -->
+        <div style="display: flex; align-items: center; gap: 10px; margin: 24px 0 14px">
+            <div style="flex: 1; font-size: 13px; font-weight: 600">Brute-force protection (fail2ban)</div>
+            <span v-if="fail2ban && fail2ban.installed" style="font-size: 11px; font-weight: 600; color: var(--cp-grn); background: rgba(52,211,153,.16); padding: 3px 10px; border-radius: 999px">ACTIVE</span>
+        </div>
+
+        <div v-if="!fail2ban || !fail2ban.installed" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 24px; text-align: center">
+            <div style="font-size: 12.5px; color: var(--cp-dim); margin-bottom: 14px">Automatically ban IPs after repeated failed SSH logins.</div>
+            <button type="button" @click="installF2b" style="font-size: 13px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 9px; padding: 9px 16px; cursor: pointer; font-family: inherit">Install &amp; enable fail2ban</button>
+        </div>
+
+        <div v-else style="display: flex; flex-direction: column; gap: 12px">
+            <div v-for="j in fail2ban.jails" :key="j.name" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; overflow: hidden">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 15px; border-bottom: 1px solid var(--cp-ln)">
+                    <i class="ti ti-shield-x" style="font-size: 16px; color: var(--cp-vio)" aria-hidden="true"></i>
+                    <span style="font-family: ui-monospace, monospace; font-weight: 500; font-size: 13px">{{ j.name }}</span>
+                    <span style="flex: 1"></span>
+                    <span style="font-size: 11.5px; color: var(--cp-dim)">{{ j.total }} banned</span>
+                </div>
+                <div v-if="!j.banned.length" style="padding: 14px 15px; font-size: 12px; color: var(--cp-dim)">No IPs currently banned.</div>
+                <div v-for="(ip, i) in j.banned" :key="ip"
+                    :style="`display:flex;align-items:center;gap:12px;padding:9px 15px;font-size:13px;${i < j.banned.length - 1 ? 'border-bottom:1px solid var(--cp-ln)' : ''}`">
+                    <span style="font-family: ui-monospace, monospace; flex: 1">{{ ip }}</span>
+                    <button type="button" @click="unban(j.name, ip)" style="font-size: 11.5px; color: var(--cp-mut); background: transparent; border: 1px solid var(--cp-ln); border-radius: 7px; padding: 4px 10px; cursor: pointer; font-family: inherit">Unban</button>
+                </div>
             </div>
         </div>
     </AppLayout>
