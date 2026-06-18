@@ -55,3 +55,77 @@ body {
     color: var(--cp-ink);
     -webkit-font-smoothing: antialiased;
 }
+
+/* ------------------------------------------------------------------ *
+ * Responsive shell + mobile layout
+ *
+ * The panel is built with inline styles, so the only way a media query
+ * can reshape the dense grids is to override them with !important. These
+ * rules turn the fixed desktop layout into a usable mobile one.
+ * ------------------------------------------------------------------ */
+
+/* Desktop defaults (the structural layout lives in classes so it can flex). */
+.cp-topbar { display: none; }
+.cp-backdrop { display: none; }
+.cp-sidebar { width: 200px; flex-shrink: 0; }
+
+@media (max-width: 860px) {
+    /* Top bar with a hamburger replaces the always-on sidebar. */
+    .cp-topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        padding: 10px 14px;
+        background: var(--cp-side);
+        border-bottom: 1px solid var(--cp-ln);
+    }
+
+    /* Sidebar becomes an off-canvas drawer. */
+    .cp-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 248px;
+        max-width: 84vw;
+        z-index: 60;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        overflow-y: auto;
+    }
+    .cp-sidebar.cp-open { transform: translateX(0); box-shadow: 0 0 40px rgba(0, 0, 0, 0.5); }
+
+    .cp-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    .cp-main { padding: 14px 14px 28px !important; }
+
+    /* Collapse dense inline-style grids. Blanket rule first, then keep the
+       small metric tiles two-up so the dashboard isn't a tall ribbon. */
+    .cp-main [style*='grid-template-columns'] { grid-template-columns: 1fr !important; }
+    .cp-main [style*='repeat(3,'],
+    .cp-main [style*='repeat(4,'],
+    .cp-main [style*='repeat(5,'] { grid-template-columns: 1fr 1fr !important; }
+
+    /* Fixed-width cards/modals/forms must fit the viewport. */
+    .cp-main [style*='width: 720px'],
+    .cp-main [style*='width: 620px'],
+    .cp-main [style*='width: 560px'],
+    .cp-main [style*='width: 520px'],
+    .cp-main [style*='width: 420px'],
+    .cp-main [style*='width: 380px'],
+    .cp-main [style*='width: 340px'],
+    .cp-main [style*='width: 320px'] { width: 100% !important; max-width: 100% !important; }
+
+    /* Let any still-too-wide block scroll instead of breaking the page. */
+    .cp-main { overflow-x: hidden; }
+    .cp-main table { display: block; overflow-x: auto; }
+}

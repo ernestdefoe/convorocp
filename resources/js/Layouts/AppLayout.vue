@@ -1,7 +1,9 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import ThemeToggle from '../Components/ThemeToggle.vue';
+
+const mobileOpen = ref(false);
 
 const props = defineProps({
     variant: { type: String, default: '' },
@@ -73,8 +75,23 @@ function logout() {
 </script>
 
 <template>
-    <div style="display: flex; min-height: 100vh; background: var(--cp-bg)">
-        <aside style="width: 200px; flex-shrink: 0; background: var(--cp-side); border-right: 1px solid var(--cp-ln); padding: 16px 12px; display: flex; flex-direction: column; gap: 3px">
+    <div style="min-height: 100vh; background: var(--cp-bg)">
+        <!-- Mobile top bar (hidden on desktop via .cp-topbar) -->
+        <div class="cp-topbar">
+            <button type="button" @click="mobileOpen = true" aria-label="Open menu"
+                style="border: 0; background: transparent; color: var(--cp-ink); cursor: pointer; padding: 4px; display: inline-flex; align-items: center">
+                <i class="ti ti-menu-2" style="font-size: 22px" aria-hidden="true"></i>
+            </button>
+            <img v-if="brand.logo" :src="brand.logo" :alt="brand.name" style="width: 24px; height: 24px; border-radius: 7px; object-fit: contain" />
+            <div v-else style="width: 24px; height: 24px; border-radius: 7px; background: var(--cp-ind); display: flex; align-items: center; justify-content: center">
+                <i class="ti ti-sailboat" style="font-size: 15px; color: #fff" aria-hidden="true"></i>
+            </div>
+            <span style="font-size: 15px; font-weight: 600; letter-spacing: -0.02em">{{ brand.name }}</span>
+        </div>
+
+        <div style="display: flex; min-height: 100vh">
+            <div v-if="mobileOpen" class="cp-backdrop" @click="mobileOpen = false"></div>
+            <aside class="cp-sidebar" :class="{ 'cp-open': mobileOpen }" style="background: var(--cp-side); border-right: 1px solid var(--cp-ln); padding: 16px 12px; display: flex; flex-direction: column; gap: 3px">
             <div style="display: flex; align-items: center; gap: 9px; padding: 4px 8px 14px">
                 <img v-if="brand.logo" :src="brand.logo" :alt="brand.name" style="width: 28px; height: 28px; border-radius: 8px; object-fit: contain" />
                 <div v-else style="width: 28px; height: 28px; border-radius: 8px; background: var(--cp-ind); display: flex; align-items: center; justify-content: center">
@@ -85,7 +102,7 @@ function logout() {
                     <div v-if="tag" style="font-size: 9.5px; font-weight: 500; color: var(--cp-vio)">{{ tag }}</div>
                 </div>
             </div>
-            <a v-for="item in nav" :key="item.key" :href="item.href"
+            <a v-for="item in nav" :key="item.key" :href="item.href" @click="mobileOpen = false"
                 :style="`display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;font-size:13px;text-decoration:none;${item.key === activeKey ? 'background:rgba(91,91,214,.16);color:var(--cp-ink)' : 'color:var(--cp-mut)'}`">
                 <i class="ti" :class="item.icon" :style="`font-size:17px;${item.key === activeKey ? 'color:var(--cp-vio)' : ''}`" aria-hidden="true"></i>{{ item.label }}
             </a>
@@ -102,15 +119,16 @@ function logout() {
                 </div>
             </div>
         </aside>
-        <main style="flex: 1; min-width: 0; padding: 20px 26px">
-            <div v-if="title" style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px">
-                <div style="flex: 1">
-                    <div v-if="subtitle" style="font-size: 11px; color: var(--cp-dim)">{{ subtitle }}</div>
-                    <div style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em">{{ title }}</div>
+            <main class="cp-main" style="flex: 1; min-width: 0; padding: 20px 26px">
+                <div v-if="title" style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap">
+                    <div style="flex: 1; min-width: 0">
+                        <div v-if="subtitle" style="font-size: 11px; color: var(--cp-dim)">{{ subtitle }}</div>
+                        <div style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em">{{ title }}</div>
+                    </div>
+                    <slot name="actions" />
                 </div>
-                <slot name="actions" />
-            </div>
-            <slot />
-        </main>
+                <slot />
+            </main>
+        </div>
     </div>
 </template>
