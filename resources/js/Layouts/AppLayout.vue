@@ -26,6 +26,7 @@ const navSets = {
         { key: 'services', label: 'Services', icon: 'ti-server-cog', href: '/services' },
         { key: 'terminal', label: 'Terminal', icon: 'ti-terminal-2', href: '/terminal' },
         { key: 'security', label: 'Security', icon: 'ti-shield-lock', href: '/security' },
+        { key: 'updates', label: 'Updates', icon: 'ti-refresh-alert', href: '/updates' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },

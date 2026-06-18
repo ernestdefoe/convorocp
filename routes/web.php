@@ -16,6 +16,7 @@ use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\TerminalController;
+use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -123,6 +124,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
     Route::post('/backups/{backup}/restore', [BackupController::class, 'restore'])->name('backups.restore');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
+
+    Route::get('/updates', [UpdateController::class, 'index'])->name('updates.index');
+    Route::post('/updates/check', [UpdateController::class, 'check'])->name('updates.check');
+    Route::post('/updates/settings', [UpdateController::class, 'saveSettings'])->name('updates.settings');
+    Route::post('/updates/apply', [UpdateController::class, 'apply'])->name('updates.apply');
 
     Route::get('/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('/security/rules', [SecurityController::class, 'addRule'])->name('security.rules.add');

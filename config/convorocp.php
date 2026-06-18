@@ -2,6 +2,22 @@
 
 return [
     /*
+     * The installed ConvoroCP version. Compared against the latest GitHub
+     * release/tag on the Updates page; the panel.update agent op pulls and
+     * applies a newer tag. Bump this on every release tag.
+     */
+    'version' => '1.0.0',
+
+    /*
+     * Self-update source. `repo` is owner/name on GitHub; private repos need a
+     * token (set in the panel, stored encrypted). The updater downloads the tag
+     * tarball, syncs it in, then runs composer install + migrations.
+     */
+    'update' => [
+        'repo' => env('CONVOROCP_UPDATE_REPO', 'ernestdefoe/convorocp'),
+    ],
+
+    /*
      * PHP versions installed on a node and offered per-site. The agent only ever
      * points a site's FPM pool at one of these — it never installs at request time.
      */

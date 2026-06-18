@@ -29,6 +29,7 @@ class Agent
         'mail.account_create', 'mail.account_delete',
         'service.control',
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
+        'panel.update',
     ];
 
     public static function dispatch(string $op, array $args): AgentOperation

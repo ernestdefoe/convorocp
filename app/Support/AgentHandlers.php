@@ -35,6 +35,7 @@ class AgentHandlers
         'backup.restore' => 'backupRestore',
         'mail.account_create' => 'mailAccountCreate',
         'mail.account_delete' => 'mailAccountDelete',
+        'panel.update' => 'panelUpdate',
         'service.control' => 'serviceControl',
         'firewall.allow' => 'firewallRule',
         'firewall.remove' => 'firewallRemove',
@@ -486,6 +487,81 @@ class AgentHandlers
         self::run(['chmod', '640', $file]);
     }
 
+    // ---- Self-update ----------------------------------------------------
+
+    private static function panelUpdate(array $args): array
+    {
+        $repo = (string) ($args['repo'] ?? '');
+        $tag = (string) ($args['tag'] ?? '');
+        $token = $args['token'] ?? null;
+        if (! preg_match('#^[\w.-]+/[\w.-]+$#', $repo)) {
+            throw new \RuntimeException('Invalid repo.');
+        }
+        if (! preg_match('/^[\w.-]+$/', $tag)) {
+            throw new \RuntimeException('Invalid tag.');
+        }
+
+        $dest = base_path();
+        $tmp = '/tmp/convorocp-update-'.preg_replace('/[^\w.-]/', '', $tag);
+        self::run(['rm', '-rf', $tmp]);
+        mkdir($tmp, 0755, true);
+
+        // Download the tag tarball from GitHub (token for private repos).
+        $hdr = ['-H', 'User-Agent: ConvoroCP', '-H', 'Accept: application/vnd.github+json'];
+        if ($token) {
+            $hdr[] = '-H';
+            $hdr[] = 'Authorization: Bearer '.$token;
+        }
+        $url = "https://api.github.com/repos/{$repo}/tarball/{$tag}";
+        $dl = self::run(array_merge(['curl', '-fsSL'], $hdr, ['-o', "{$tmp}/src.tar.gz", $url]), 300);
+        if (! $dl->successful()) {
+            throw new \RuntimeException('Download failed: '.trim($dl->errorOutput()));
+        }
+
+        $ex = self::run(['tar', '-xzf', "{$tmp}/src.tar.gz", '-C', $tmp], 120);
+        if (! $ex->successful()) {
+            throw new \RuntimeException('Extract failed: '.trim($ex->errorOutput()));
+        }
+        $dirs = glob($tmp.'/*', GLOB_ONLYDIR);
+        $src = $dirs[0] ?? null;
+        if (! $src) {
+            throw new \RuntimeException('Archive empty.');
+        }
+
+        // Sync new code in, preserving runtime state + currently built assets.
+        $excludes = ['.env', 'storage', 'database', 'bootstrap/cache', 'public/build', '.git', 'node_modules', 'vendor'];
+        $rsync = ['rsync', '-a', '--delete'];
+        foreach ($excludes as $e) {
+            $rsync[] = '--exclude';
+            $rsync[] = $e;
+        }
+        $rsync[] = rtrim($src, '/').'/';
+        $rsync[] = rtrim($dest, '/').'/';
+        $rs = self::run($rsync, 300);
+        if (! $rs->successful()) {
+            throw new \RuntimeException('Sync failed: '.trim($rs->errorOutput()));
+        }
+
+        // Backend dependencies + migrations + cache.
+        self::run(['bash', '-c', "cd {$dest} && COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer install --no-dev --optimize-autoloader 2>&1"], 600);
+        self::run(['php8.4', "{$dest}/artisan", 'migrate', '--force'], 300);
+        self::run(['php8.4', "{$dest}/artisan", 'optimize:clear'], 120);
+        self::run(['chown', '-R', 'www-data:www-data', "{$dest}/bootstrap/cache", "{$dest}/storage", "{$dest}/database"]);
+        self::run(['systemctl', 'reload', 'php8.4-fpm']);
+        self::run(['rm', '-rf', $tmp]);
+
+        if (class_exists(\App\Support\Setting::class)) {
+            \App\Support\Setting::set('panel.updated_at', now()->toIso8601String());
+            \App\Support\Setting::set('panel.updated_to', $tag);
+        }
+
+        // Restart the agent AFTER this op finishes so we don't kill ourselves
+        // mid-handler (the worker has the old code loaded in memory).
+        self::run(['bash', '-c', 'nohup sh -c "sleep 3; systemctl restart convorocp-agent" >/dev/null 2>&1 &']);
+
+        return ['applied' => true, 'tag' => $tag];
+    }
+
     // ---- Services -------------------------------------------------------
 
     /** Services the panel may control. Excludes convorocp-agent (self) for safety. */
@@ -780,6 +856,7 @@ class AgentHandlers
             $op === 'backup.restore' => "restore ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
             $op === 'mail.account_create' => "create mailbox ".($args['email'] ?? ''),
             $op === 'mail.account_delete' => "delete mailbox ".($args['email'] ?? ''),
+            $op === 'panel.update' => "update ConvoroCP to ".($args['tag'] ?? ''),
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
             str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
