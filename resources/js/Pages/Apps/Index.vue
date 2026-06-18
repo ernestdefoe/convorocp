@@ -31,7 +31,9 @@ const field = 'box-sizing:border-box;width:100%;background:var(--cp-card2);borde
 
         <!-- catalog -->
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 22px">
-            <div v-for="a in catalog" :key="a.key" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 16px">
+            <div v-for="a in catalog" :key="a.key"
+                :style="`position:relative;background:var(--cp-card);border:1px solid ${a.featured ? 'var(--cp-ind)' : 'var(--cp-ln)'};border-radius:13px;padding:16px`">
+                <span v-if="a.featured" style="position: absolute; top: 12px; right: 12px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; color: #fff; background: var(--cp-ind); padding: 2px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px"><i class="ti ti-star-filled" style="font-size: 10px" aria-hidden="true"></i>FEATURED</span>
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 9px">
                     <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(91,91,214,.14); display: flex; align-items: center; justify-content: center"><i class="ti" :class="a.icon" style="font-size: 20px; color: var(--cp-vio)" aria-hidden="true"></i></div>
                     <div style="font-size: 14px; font-weight: 600">{{ a.name }}</div>

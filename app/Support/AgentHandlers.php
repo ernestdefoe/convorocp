@@ -663,6 +663,7 @@ class AgentHandlers
                 'wordpress' => self::appWordpress($pub, $domain),
                 'phpmyadmin' => self::appPhpMyAdmin($pub),
                 'convoro' => self::appConvoro($dir, $domain),
+                'flarum' => self::appFlarum($dir, $domain),
                 default => throw new \RuntimeException('Unknown app.'),
             };
             self::run(['chown', '-R', 'www-data:www-data', $dir]);
@@ -802,6 +803,39 @@ class AgentHandlers
         self::run(['rm', '-rf', $tmp]);
 
         return "Convoro Forums installed · DB {$db}";
+    }
+
+    private static function appFlarum(string $dir, string $domain): string
+    {
+        [$db, $user, $pass] = self::createAppDb($domain);
+        $tmp = '/tmp/fl-'.bin2hex(random_bytes(4));
+        // create-project needs an empty target, so build in a temp dir then sync in.
+        $cp = self::run(['bash', '-c', 'COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer create-project flarum/flarum '.escapeshellarg($tmp).' --no-interaction --no-dev 2>&1'], 900);
+        if (! $cp->successful() || ! is_file("{$tmp}/flarum")) {
+            self::run(['rm', '-rf', $tmp]);
+            throw new \RuntimeException('Flarum download failed: '.trim(substr($cp->errorOutput().$cp->output(), -160)));
+        }
+        self::run(['bash', '-c', 'cp -a '.escapeshellarg($tmp).'/. '.escapeshellarg($dir).'/']);
+        self::run(['rm', '-rf', $tmp]);
+
+        $adminPass = bin2hex(random_bytes(6));
+        $cfg = "/tmp/flarum-{$db}.yml";
+        $yml = "debug: false\n".
+            "baseUrl: http://{$domain}\n".
+            "databaseConfiguration:\n".
+            "  driver: mysql\n  host: localhost\n  database: {$db}\n  username: {$user}\n  password: \"{$pass}\"\n  prefix: ''\n".
+            "adminUser:\n".
+            "  username: admin\n  password: \"{$adminPass}\"\n  password_confirmation: \"{$adminPass}\"\n  email: admin@{$domain}\n".
+            "settings:\n  forum_title: \"{$domain}\"\n";
+        file_put_contents($cfg, $yml);
+
+        $inst = self::run(['bash', '-c', 'cd '.escapeshellarg($dir).' && php8.4 flarum install -f '.escapeshellarg($cfg).' 2>&1'], 300);
+        @unlink($cfg);
+        if (! $inst->successful()) {
+            throw new \RuntimeException('Flarum install failed: '.trim(substr($inst->errorOutput().$inst->output(), -160)));
+        }
+
+        return "Flarum installed · admin / {$adminPass} · DB {$db}";
     }
 
     // ---- Services -------------------------------------------------------

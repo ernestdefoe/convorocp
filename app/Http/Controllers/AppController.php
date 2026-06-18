@@ -13,7 +13,8 @@ class AppController extends Controller
     /** One-click app catalog. */
     public const CATALOG = [
         'wordpress' => ['name' => 'WordPress', 'desc' => "The world's most popular CMS & blog platform.", 'icon' => 'ti-brand-wordpress', 'db' => true],
-        'convoro' => ['name' => 'Convoro Forums', 'desc' => 'Modern community forum platform.', 'icon' => 'ti-messages', 'db' => true],
+        'convoro' => ['name' => 'Convoro Forums', 'desc' => 'Modern community forum platform.', 'icon' => 'ti-messages', 'db' => true, 'featured' => true],
+        'flarum' => ['name' => 'Flarum', 'desc' => 'Delightfully simple, fast forum software.', 'icon' => 'ti-message-circle', 'db' => true],
         'phpmyadmin' => ['name' => 'phpMyAdmin', 'desc' => 'Web-based MySQL / MariaDB administration.', 'icon' => 'ti-database-cog', 'db' => false],
         'static' => ['name' => 'Static site', 'desc' => 'A blank starter page to build from.', 'icon' => 'ti-file-code', 'db' => false],
     ];
@@ -25,7 +26,8 @@ class AppController extends Controller
 
     public function index(Request $request)
     {
-        $catalog = collect(self::CATALOG)->map(fn ($a, $key) => ['key' => $key] + $a)->values();
+        $catalog = collect(self::CATALOG)->map(fn ($a, $key) => ['key' => $key, 'featured' => $a['featured'] ?? false] + $a)
+            ->sortByDesc('featured')->values();
 
         $installs = ($request->user()->isOperator() ? AppInstall::query() : AppInstall::where('user_id', $request->user()->id))
             ->latest()->take(25)->get()->map(fn (AppInstall $i) => [
