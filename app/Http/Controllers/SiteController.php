@@ -31,6 +31,7 @@ class SiteController extends Controller
             'php_version' => $s->php_version,
             'status' => $s->status,
             'ssl_status' => $s->ssl_status,
+            'adopted' => $s->adopted,
             'owner' => $s->owner?->name,
         ]);
 
@@ -88,6 +89,7 @@ class SiteController extends Controller
                 'branch' => $site->branch,
                 'auto_deploy' => $site->auto_deploy,
                 'php_settings' => $site->phpSettings(),
+                'adopted' => $site->adopted,
                 'deploy_webhook' => url('/deploy-hook/'.$site->id.'/'.$site->deployToken()),
             ],
             'phpVersions' => \App\Models\PhpRuntime::installed(),
@@ -98,6 +100,7 @@ class SiteController extends Controller
     public function setPhp(Request $request, Site $site)
     {
         $this->authorizeSite($request, $site);
+        abort_if($site->adopted, 422, 'This site is adopted (managed externally) — PHP changes are disabled.');
         $data = $request->validate([
             'php_version' => ['required', 'in:'.implode(',', \App\Models\PhpRuntime::installed())],
         ]);
@@ -111,6 +114,7 @@ class SiteController extends Controller
     public function setPhpSettings(Request $request, Site $site)
     {
         $this->authorizeSite($request, $site);
+        abort_if($site->adopted, 422, 'This site is adopted (managed externally) — PHP changes are disabled.');
         $data = $request->validate([
             'memory_limit' => ['required', 'regex:/^\d+[KMG]?$/i'],
             'upload_max_filesize' => ['required', 'regex:/^\d+[KMG]?$/i'],
@@ -179,10 +183,38 @@ class SiteController extends Controller
         return response()->json(['ok' => true, 'queued' => false]);
     }
 
+    /**
+     * Adopt an existing app/vhost ConvoroCP did NOT provision (operator only).
+     * Records it + symlinks the path; never writes a vhost/pool or touches files.
+     */
+    public function adopt(Request $request)
+    {
+        abort_unless($request->user()->isOperator(), 403);
+        $data = $request->validate([
+            'domain' => ['required', 'string', 'max:191', 'unique:sites,domain', 'regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i'],
+            'path' => ['required', 'string', 'max:255'],
+        ]);
+
+        $site = Site::create([
+            'user_id' => $request->user()->id,
+            'domain' => strtolower($data['domain']),
+            'runtime' => 'php',
+            'php_version' => \App\Models\PhpRuntime::installed()[0] ?? null,
+            'php_settings' => Site::defaultPhpSettings(),
+            'status' => 'active',
+            'ssl_status' => 'active',
+            'adopted' => true,
+        ]);
+        Agent::dispatch('site.adopt', ['domain' => $site->domain, 'path' => $data['path']]);
+
+        return redirect('/sites/'.$site->id);
+    }
+
     public function destroy(Request $request, Site $site)
     {
         $this->authorizeSite($request, $site);
-        Agent::dispatch('site.delete', ['domain' => $site->domain]);
+        // Adopted sites are only ever detached (symlink removed) — never hard-deleted.
+        Agent::dispatch($site->adopted ? 'site.detach' : 'site.delete', ['domain' => $site->domain]);
         $site->delete();
 
         return redirect('/sites');

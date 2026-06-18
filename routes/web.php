@@ -90,6 +90,7 @@ Route::middleware('auth')->get('/', function (Request $request) {
 Route::middleware('auth')->group(function () {
     Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
     Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
+    Route::post('/sites/adopt', [SiteController::class, 'adopt'])->name('sites.adopt');
     Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
     Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');

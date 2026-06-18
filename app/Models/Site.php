@@ -9,7 +9,7 @@ class Site extends Model
 {
     protected $fillable = [
         'user_id', 'domain', 'runtime', 'php_version', 'php_settings', 'status',
-        'ssl_status', 'repo', 'branch', 'auto_deploy', 'deploy_token',
+        'ssl_status', 'repo', 'branch', 'auto_deploy', 'deploy_token', 'adopted',
     ];
 
     /** The auto-deploy webhook token, generated on first access. */
@@ -22,7 +22,7 @@ class Site extends Model
         return $this->deploy_token;
     }
 
-    protected $casts = ['auto_deploy' => 'boolean', 'php_settings' => 'array'];
+    protected $casts = ['auto_deploy' => 'boolean', 'php_settings' => 'array', 'adopted' => 'boolean'];
 
     /** Functions an operator/client may toggle off for a site. */
     public const DISABLEABLE_FUNCTIONS = [

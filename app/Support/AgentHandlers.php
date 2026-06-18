@@ -17,6 +17,8 @@ class AgentHandlers
     /** op name => handler method */
     private const HANDLERS = [
         'site.create' => 'siteCreate',
+        'site.adopt' => 'siteAdopt',
+        'site.detach' => 'siteDetach',
         'site.set_php_version' => 'siteSetPhpVersion',
         'site.set_php_settings' => 'siteSetPhpSettings',
         'site.deploy' => 'siteDeploy',
@@ -201,9 +203,47 @@ class AgentHandlers
         return ['applied' => true, 'domain' => $domain, 'repo' => $repo, 'branch' => $branch];
     }
 
+    private static function siteAdopt(array $args): array
+    {
+        $domain = self::domain($args);
+        $path = (string) ($args['path'] ?? '');
+        // Only ever create a symlink to an existing app dir — never write a vhost,
+        // pool, or files. Adopting must not touch the live site's serving config.
+        if ($path === '' || ! is_dir($path) || str_contains($path, '..')) {
+            throw new \RuntimeException('Adopt path must be an existing directory.');
+        }
+        $link = "/var/www/sites/{$domain}";
+        if (! is_dir('/var/www/sites')) {
+            mkdir('/var/www/sites', 0755, true);
+        }
+        if (file_exists($link) || is_link($link)) {
+            throw new \RuntimeException('A site dir already exists for that domain.');
+        }
+        self::run(['ln', '-s', rtrim($path, '/'), $link]);
+
+        return ['applied' => true, 'domain' => $domain, 'adopted' => true, 'path' => $path];
+    }
+
+    private static function siteDetach(array $args): array
+    {
+        $domain = self::domain($args);
+        $link = "/var/www/sites/{$domain}";
+        // Remove ONLY the symlink — never the target app, vhost, or pool.
+        if (is_link($link)) {
+            @unlink($link);
+        }
+
+        return ['applied' => true, 'domain' => $domain, 'detached' => true];
+    }
+
     private static function siteDelete(array $args): array
     {
         $domain = self::domain($args);
+        // Safety: an adopted (symlinked) site must be detached, never hard-deleted
+        // — its vhost/pool/files belong to an externally-managed app.
+        if (is_link("/var/www/sites/{$domain}")) {
+            return self::siteDetach($args);
+        }
         @unlink("/etc/nginx/sites-enabled/{$domain}");
         @unlink("/etc/nginx/sites-available/{$domain}");
         foreach (self::installedVersions() as $v) {
@@ -1132,6 +1172,8 @@ class AgentHandlers
 
         return match (true) {
             $op === 'site.create' => "render nginx vhost + PHP-FPM pool for {$d}, reload",
+            $op === 'site.adopt' => "adopt existing app at ".($args['path'] ?? '')." as {$d} (symlink only)",
+            $op === 'site.detach' => "detach {$d} from the panel (remove symlink only)",
             $op === 'site.delete' => "remove vhost + pool + webroot for {$d}",
             $op === 'site.set_php_version' => "point {$d} FPM pool at PHP ".($args['php'] ?? '?'),
             $op === 'site.set_php_settings' => "apply PHP/INI settings to {$d}",
