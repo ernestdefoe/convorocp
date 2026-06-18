@@ -17,6 +17,7 @@ const navSets = {
         { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
+        { key: 'mail', label: 'Webmail', icon: 'ti-mail', href: '/mail' },
         { key: 'php', label: 'PHP', icon: 'ti-brand-php', href: '/php' },
         { key: 'containers', label: 'Docker', icon: 'ti-brand-docker', href: '/containers' },
         { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
@@ -33,7 +34,7 @@ const navSets = {
     client: [
         { key: 'home', label: 'My hosting', icon: 'ti-home', href: '/' },
         { key: 'sites', label: 'Websites', icon: 'ti-world', href: '/sites' },
-        { key: 'email', label: 'Email', icon: 'ti-mail', href: '#' },
+        { key: 'mail', label: 'Email', icon: 'ti-mail', href: '/mail' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
         { key: 'files', label: 'Files', icon: 'ti-folder', href: '#' },

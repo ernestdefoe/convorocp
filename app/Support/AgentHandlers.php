@@ -33,6 +33,8 @@ class AgentHandlers
         'container.remove' => 'containerRemove',
         'backup.run' => 'backupRun',
         'backup.restore' => 'backupRestore',
+        'mail.account_create' => 'mailAccountCreate',
+        'mail.account_delete' => 'mailAccountDelete',
         'service.control' => 'serviceControl',
         'firewall.allow' => 'firewallRule',
         'firewall.remove' => 'firewallRemove',
@@ -406,6 +408,84 @@ class AgentHandlers
         return [$port, $proto, $action];
     }
 
+    // ---- Mail (Postfix + Dovecot) --------------------------------------
+
+    private static function mailAccountCreate(array $args): array
+    {
+        $email = strtolower(trim((string) ($args['email'] ?? '')));
+        $password = (string) ($args['password'] ?? '');
+        $id = (int) ($args['account_id'] ?? 0);
+        if (! preg_match('/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/', $email)) {
+            throw new \RuntimeException('Invalid email address.');
+        }
+        if ($password === '' || strlen($password) > 200 || str_contains($password, ':') || str_contains($password, "\n")) {
+            throw new \RuntimeException('Invalid mailbox password.');
+        }
+        [, $domain] = explode('@', $email, 2);
+
+        self::ensureMailDomain($domain);
+        self::writeDovecotUser($email, $password);
+        self::run(['systemctl', 'reload', 'dovecot']);
+
+        if ($id && class_exists(\App\Models\MailAccount::class)) {
+            \App\Models\MailAccount::where('id', $id)->update(['status' => 'active']);
+        }
+
+        return ['applied' => true, 'email' => $email];
+    }
+
+    private static function mailAccountDelete(array $args): array
+    {
+        $email = strtolower(trim((string) ($args['email'] ?? '')));
+        if (! str_contains($email, '@')) {
+            throw new \RuntimeException('Invalid email address.');
+        }
+        [$local, $domain] = explode('@', $email, 2);
+
+        self::removeDovecotUser($email);
+        self::run(['systemctl', 'reload', 'dovecot']);
+
+        if (preg_match('/^[a-z0-9._%+-]+$/', $local) && preg_match('/^[a-z0-9.-]+$/', $domain) && ! str_contains($domain, '..')) {
+            self::run(['rm', '-rf', "/var/vmail/{$domain}/{$local}"]);
+        }
+
+        return ['applied' => true, 'email' => $email];
+    }
+
+    private static function ensureMailDomain(string $domain): void
+    {
+        $current = trim(self::run(['postconf', '-h', 'virtual_mailbox_domains'])->output());
+        $list = array_values(array_filter(array_map('trim', preg_split('/[,\s]+/', $current))));
+        if (! in_array($domain, $list, true)) {
+            $list[] = $domain;
+            self::run(['postconf', '-e', 'virtual_mailbox_domains = '.implode(', ', $list)]);
+            self::run(['systemctl', 'reload', 'postfix']);
+        }
+    }
+
+    private static function writeDovecotUser(string $email, string $password): void
+    {
+        $file = '/etc/dovecot/users';
+        $lines = is_file($file) ? (file($file, FILE_IGNORE_NEW_LINES) ?: []) : [];
+        $lines = array_filter($lines, fn ($l) => $l !== '' && ! str_starts_with($l, $email.':'));
+        $lines[] = $email.':{PLAIN}'.$password;
+        file_put_contents($file, implode("\n", $lines)."\n");
+        self::run(['chown', 'root:dovecot', $file]);
+        self::run(['chmod', '640', $file]);
+    }
+
+    private static function removeDovecotUser(string $email): void
+    {
+        $file = '/etc/dovecot/users';
+        if (! is_file($file)) {
+            return;
+        }
+        $lines = array_filter(file($file, FILE_IGNORE_NEW_LINES) ?: [], fn ($l) => $l !== '' && ! str_starts_with($l, $email.':'));
+        file_put_contents($file, $lines ? implode("\n", $lines)."\n" : '');
+        self::run(['chown', 'root:dovecot', $file]);
+        self::run(['chmod', '640', $file]);
+    }
+
     // ---- Services -------------------------------------------------------
 
     /** Services the panel may control. Excludes convorocp-agent (self) for safety. */
@@ -698,6 +778,8 @@ class AgentHandlers
             str_starts_with($op, 'container.') => substr($op, 10)." docker container ".($args['name'] ?? ''),
             $op === 'backup.run' => "back up ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
             $op === 'backup.restore' => "restore ".($args['kind'] ?? '')." ".($args['target'] ?? ''),
+            $op === 'mail.account_create' => "create mailbox ".($args['email'] ?? ''),
+            $op === 'mail.account_delete' => "delete mailbox ".($args['email'] ?? ''),
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
             str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',

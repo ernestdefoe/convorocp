@@ -8,6 +8,7 @@ use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\MailController;
 use App\Http\Controllers\PhpController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SchedulerController;
@@ -132,6 +133,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
 
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
+
+    Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
+    Route::post('/mail', [MailController::class, 'store'])->name('mail.store');
+    Route::post('/mail/{account}/send', [MailController::class, 'send'])->name('mail.send');
+    Route::delete('/mail/{account}', [MailController::class, 'destroy'])->name('mail.destroy');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');
     Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');

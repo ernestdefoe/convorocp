@@ -26,6 +26,7 @@ class Agent
         'daemon.create', 'daemon.delete', 'daemon.start', 'daemon.stop', 'daemon.restart',
         'container.run', 'container.start', 'container.stop', 'container.remove',
         'backup.run', 'backup.restore', 'backup.delete',
+        'mail.account_create', 'mail.account_delete',
         'service.control',
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
     ];
