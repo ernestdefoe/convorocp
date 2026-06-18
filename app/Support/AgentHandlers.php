@@ -700,6 +700,17 @@ class AgentHandlers
             }
             self::run(['chown', '-R', 'www-data:www-data', $dir]);
             self::markBackup($id, 'done', basename($file), @filesize($file) ?: 0);
+
+            // Mirror offsite if the operator has configured S3 (best-effort).
+            if (class_exists(\App\Support\Offsite::class) && \App\Support\Offsite::configured()) {
+                try {
+                    if (\App\Support\Offsite::put($file) && $id) {
+                        \App\Models\Backup::where('id', $id)->update(['offsite' => true]);
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
         } catch (\Throwable $e) {
             self::markBackup($id, 'failed', null, 0);
             throw $e;

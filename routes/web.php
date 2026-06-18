@@ -131,6 +131,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
     Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
+    Route::post('/backups/schedules', [BackupController::class, 'storeSchedule'])->name('backups.schedules.store');
+    Route::patch('/backups/schedules/{schedule}/toggle', [BackupController::class, 'toggleSchedule'])->name('backups.schedules.toggle');
+    Route::delete('/backups/schedules/{schedule}', [BackupController::class, 'destroySchedule'])->name('backups.schedules.destroy');
+    Route::post('/backups/offsite', [BackupController::class, 'saveOffsite'])->name('backups.offsite');
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
     Route::post('/backups/{backup}/restore', [BackupController::class, 'restore'])->name('backups.restore');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');

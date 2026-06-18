@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Backup extends Model
 {
-    protected $fillable = ['user_id', 'kind', 'target', 'engine', 'filename', 'size', 'status'];
+    protected $fillable = ['user_id', 'kind', 'target', 'engine', 'filename', 'size', 'status', 'offsite'];
+
+    protected $casts = ['offsite' => 'boolean'];
 
     public function owner(): BelongsTo
     {
