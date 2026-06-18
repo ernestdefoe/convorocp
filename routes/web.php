@@ -16,6 +16,7 @@ use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\TerminalController;
+use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\SiteController;
 use Illuminate\Http\Request;
@@ -30,6 +31,10 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
+
+// Login 2FA challenge — reached mid-login (pending id in session), not yet authenticated.
+Route::get('/two-factor-challenge', [TwoFactorController::class, 'challenge'])->name('two-factor.challenge');
+Route::post('/two-factor-challenge', [TwoFactorController::class, 'challengeVerify']);
 
 // Public auto-deploy webhook (git host posts here on push; token-gated, CSRF-exempt).
 Route::post('/deploy-hook/{site}/{token}', [SiteController::class, 'webhook'])->name('sites.webhook');
@@ -139,6 +144,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
 
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
+
+    Route::get('/account', [TwoFactorController::class, 'account'])->name('account.index');
+    Route::post('/account/2fa/enable', [TwoFactorController::class, 'enable'])->name('account.2fa.enable');
+    Route::post('/account/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('account.2fa.confirm');
+    Route::delete('/account/2fa', [TwoFactorController::class, 'disable'])->name('account.2fa.disable');
 
     Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
     Route::post('/mail', [MailController::class, 'store'])->name('mail.store');

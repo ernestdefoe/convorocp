@@ -31,6 +31,7 @@ const navSets = {
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
         { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '#' },
+        { key: 'account', label: 'Account', icon: 'ti-user-shield', href: '/account' },
     ],
     client: [
         { key: 'home', label: 'My hosting', icon: 'ti-home', href: '/' },
@@ -43,6 +44,7 @@ const navSets = {
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '#' },
         { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
         { key: 'support', label: 'Support', icon: 'ti-lifebuoy', href: '#' },
+        { key: 'account', label: 'Account', icon: 'ti-user-shield', href: '/account' },
     ],
     server: [
         { key: 'dashboard', label: 'Dashboard', icon: 'ti-layout-dashboard', href: '/' },
