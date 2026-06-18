@@ -1035,11 +1035,21 @@ class AgentHandlers
         return $v;
     }
 
+    /** Docker object name: allows hyphens/dots, unlike a SQL identifier. */
+    private static function cident(string $v): string
+    {
+        if (! preg_match('/^[a-z0-9][a-z0-9_.-]{0,63}$/i', $v)) {
+            throw new \RuntimeException('Invalid container name.');
+        }
+
+        return $v;
+    }
+
     // ---- Docker containers ----------------------------------------------
 
     private static function containerRun(array $args): array
     {
-        $name = self::ident($args['name'] ?? '');
+        $name = self::cident($args['name'] ?? '');
         $image = (string) ($args['image'] ?? '');
         if (! preg_match('#^[a-z0-9][a-z0-9._/-]*(:[a-z0-9._-]+)?$#i', $image)) {
             throw new \RuntimeException('Invalid image reference.');
@@ -1067,21 +1077,21 @@ class AgentHandlers
 
     private static function containerStart(array $args): array
     {
-        self::run(['docker', 'start', 'cp-'.self::ident($args['name'] ?? '')]);
+        self::run(['docker', 'start', 'cp-'.self::cident($args['name'] ?? '')]);
 
         return ['applied' => true];
     }
 
     private static function containerStop(array $args): array
     {
-        self::run(['docker', 'stop', 'cp-'.self::ident($args['name'] ?? '')]);
+        self::run(['docker', 'stop', 'cp-'.self::cident($args['name'] ?? '')]);
 
         return ['applied' => true];
     }
 
     private static function containerRemove(array $args): array
     {
-        $name = self::ident($args['name'] ?? '');
+        $name = self::cident($args['name'] ?? '');
         self::run(['docker', 'rm', '-f', "cp-{$name}"]);
         $domain = (string) ($args['domain'] ?? '');
         if ($domain !== '' && preg_match('/^[a-z0-9.-]+$/i', $domain)) {
