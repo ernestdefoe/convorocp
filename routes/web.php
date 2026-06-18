@@ -200,6 +200,10 @@ Route::middleware('auth')->group(function () {
     Route::patch('/account/profile', [AccountController::class, 'updateProfile'])->name('account.profile');
     Route::patch('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
 
+    Route::get('/license', [App\Http\Controllers\LicenseController::class, 'index'])->name('license.index');
+    Route::post('/license', [App\Http\Controllers\LicenseController::class, 'save'])->name('license.save');
+    Route::post('/license/recheck', [App\Http\Controllers\LicenseController::class, 'recheck'])->name('license.recheck');
+
     Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
     Route::post('/mail', [MailController::class, 'store'])->name('mail.store');
     Route::post('/mail/{account}/send', [MailController::class, 'send'])->name('mail.send');

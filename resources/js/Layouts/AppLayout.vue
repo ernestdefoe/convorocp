@@ -35,6 +35,7 @@ const navSets = {
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '/billing' },
         { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '/tickets' },
         { key: 'account', label: 'Account', icon: 'ti-user-cog', href: '/account' },
+        { key: 'license', label: 'License', icon: 'ti-rosette-discount-check', href: '/license' },
     ],
     client: [
         { key: 'home', label: 'My hosting', icon: 'ti-home', href: '/' },

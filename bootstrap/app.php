@@ -15,10 +15,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         // Hourly tick; the command itself decides which schedules are due.
         $schedule->command('backups:scheduled')->hourly()->withoutOverlapping();
+        // Daily license verification (also re-checked on demand from the panel).
+        $schedule->command('license:check')->daily()->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
+            \App\Http\Middleware\EnsureLicensed::class,
         ]);
         $middleware->validateCsrfTokens(except: ['deploy-hook/*', 'billing/webhook']);
     })

@@ -46,4 +46,19 @@ return [
         'cert_staging' => env('CONVOROCP_CERT_STAGING', true),
         'cert_email' => env('CONVOROCP_CERT_EMAIL', 'admin@convorocp.test'),
     ],
+
+    /*
+     * Licensing. ConvoroCP is a paid product: a 30-day free trial, then a valid
+     * license key (a $10/mo subscription, or a permanent key). A daily background
+     * check validates the key against the Convoro store; `grace_days` keeps the
+     * panel unlocked through transient network failures. When the trial is over
+     * and no valid license is on file, the UI locks to the License screen — but
+     * the agent and already-running services are never stopped.
+     */
+    'license' => [
+        'server' => env('CONVOROCP_LICENSE_SERVER', 'https://convoro.co'),
+        'package' => 'convorocp',
+        'trial_days' => (int) env('CONVOROCP_TRIAL_DAYS', 30),
+        'grace_days' => (int) env('CONVOROCP_LICENSE_GRACE_DAYS', 7),
+    ],
 ];
