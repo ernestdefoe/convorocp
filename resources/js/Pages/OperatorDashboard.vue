@@ -66,24 +66,33 @@ const planStyle = (p) => ({
             </div>
         </div>
 
-        <!-- node resources + service health -->
-        <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px; margin-top: 14px">
-            <div style="display: flex; align-items: center; margin-bottom: 12px"><span style="font-size: 13px; font-weight: 600; flex: 1">Node services</span><span style="font-size: 11px; color: var(--cp-dim)">kernel {{ node.kernel }} · PHP {{ node.php }}</span></div>
-            <div style="display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px">
-                <div v-for="c in [
-                    { n: node.counts.sites, l: 'Sites' }, { n: node.counts.databases, l: 'Databases' },
-                    { n: node.counts.containers, l: 'Containers' }, { n: node.counts.mailboxes, l: 'Mailboxes' },
-                    { n: node.counts.customers, l: 'Customers' },
-                ]" :key="c.l" style="min-width: 70px">
-                    <div style="font-size: 19px; font-weight: 600">{{ c.n }}</div>
-                    <div style="font-size: 11px; color: var(--cp-dim)">{{ c.l }}</div>
-                </div>
+        <!-- resources -->
+        <div style="margin-top: 14px; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--cp-mut)">Resources on this node</div>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; margin-bottom: 14px">
+            <div v-for="c in [
+                { n: node.counts.sites, l: 'Sites', icon: 'ti-world' },
+                { n: node.counts.databases, l: 'Databases', icon: 'ti-database' },
+                { n: node.counts.containers, l: 'Containers', icon: 'ti-brand-docker' },
+                { n: node.counts.mailboxes, l: 'Mailboxes', icon: 'ti-mail' },
+                { n: node.counts.customers, l: 'Customers', icon: 'ti-users' },
+            ]" :key="c.l" style="background: var(--cp-card2); border-radius: 12px; padding: 12px 13px">
+                <div style="display: flex; align-items: center; gap: 6px; color: var(--cp-dim)"><i class="ti" :class="c.icon" style="font-size: 14px" aria-hidden="true"></i><span style="font-size: 11px">{{ c.l }}</span></div>
+                <div style="font-size: 22px; font-weight: 600; margin-top: 3px">{{ c.n }}</div>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 18px; border-top: 1px solid var(--cp-ln); padding-top: 12px">
-                <div v-for="s in node.services" :key="s.name" style="display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0">
-                    <span :style="`width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${s.status === 'active' ? 'var(--cp-grn)' : s.status === 'inactive' ? 'var(--cp-dim)' : 'var(--cp-amb)'}`"></span>
-                    <span style="flex: 1; color: var(--cp-mut)">{{ s.label }}</span>
-                    <span :style="`font-size:10.5px;text-transform:capitalize;color:${s.status === 'active' ? 'var(--cp-grn)' : 'var(--cp-dim)'}`">{{ s.status }}</span>
+        </div>
+
+        <!-- service health -->
+        <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); overflow: hidden">
+            <div style="display: flex; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--cp-ln)">
+                <span style="font-size: 13px; font-weight: 600; flex: 1">Service health</span>
+                <span style="font-size: 11px; color: var(--cp-dim)">kernel {{ node.kernel }} · PHP {{ node.php }}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr">
+                <div v-for="(s, i) in node.services" :key="s.name"
+                    :style="`display:flex;align-items:center;gap:9px;padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--cp-ln);${i % 2 === 0 ? 'border-right:1px solid var(--cp-ln)' : ''}`">
+                    <span :style="`width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${s.status === 'active' ? 'var(--cp-grn)' : s.status === 'failed' ? 'var(--cp-red)' : 'var(--cp-dim)'}`"></span>
+                    <span style="flex: 1; color: var(--cp-ink)">{{ s.label }}</span>
+                    <span :style="`font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;${s.status === 'active' ? 'background:rgba(52,211,153,.16);color:var(--cp-grn)' : s.status === 'failed' ? 'background:rgba(248,113,113,.16);color:var(--cp-red)' : 'background:var(--cp-soft);color:var(--cp-dim)'}`">{{ s.status === 'active' ? 'Running' : s.status === 'inactive' ? 'Stopped' : s.status }}</span>
                 </div>
             </div>
         </div>

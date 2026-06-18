@@ -36,6 +36,7 @@ class AgentHandlers
         'mail.account_create' => 'mailAccountCreate',
         'mail.account_delete' => 'mailAccountDelete',
         'panel.update' => 'panelUpdate',
+        'app.install' => 'appInstall',
         'service.control' => 'serviceControl',
         'firewall.allow' => 'firewallRule',
         'firewall.remove' => 'firewallRemove',
@@ -631,6 +632,176 @@ class AgentHandlers
         self::run(['bash', '-c', 'nohup sh -c "sleep 3; systemctl restart convorocp-agent" >/dev/null 2>&1 &']);
 
         return ['applied' => true, 'tag' => $tag];
+    }
+
+    // ---- One-click apps -------------------------------------------------
+
+    private static function appInstall(array $args): array
+    {
+        $id = (int) ($args['install_id'] ?? 0);
+        $app = (string) ($args['app'] ?? '');
+        $domain = (string) ($args['domain'] ?? '');
+        if (! preg_match('/^[a-z0-9.-]+$/i', $domain) || str_contains($domain, '..')) {
+            throw new \RuntimeException('Invalid domain.');
+        }
+        $dir = "/var/www/sites/{$domain}";
+        if (! is_dir($dir)) {
+            throw new \RuntimeException('Site is not provisioned.');
+        }
+
+        // Sites serve from {dir}/public. Root-docroot apps (WordPress, phpMyAdmin,
+        // static) install there; Convoro is a Laravel app whose own public/ becomes
+        // the docroot, so it installs at the site root.
+        $pub = "{$dir}/public";
+        if (! is_dir($pub)) {
+            mkdir($pub, 0755, true);
+        }
+
+        try {
+            $info = match ($app) {
+                'static' => self::appStatic($pub, $domain),
+                'wordpress' => self::appWordpress($pub, $domain),
+                'phpmyadmin' => self::appPhpMyAdmin($pub),
+                'convoro' => self::appConvoro($dir, $domain),
+                default => throw new \RuntimeException('Unknown app.'),
+            };
+            self::run(['chown', '-R', 'www-data:www-data', $dir]);
+            self::markInstall($id, 'done', $info);
+        } catch (\Throwable $e) {
+            self::markInstall($id, 'failed', substr($e->getMessage(), 0, 180));
+            throw $e;
+        }
+
+        return ['applied' => true, 'app' => $app, 'domain' => $domain];
+    }
+
+    private static function markInstall(int $id, string $status, ?string $info): void
+    {
+        if ($id && class_exists(\App\Models\AppInstall::class)) {
+            \App\Models\AppInstall::where('id', $id)->update(['status' => $status, 'info' => $info]);
+        }
+    }
+
+    /** @return array{0:string,1:string,2:string} db, user, password */
+    private static function createAppDb(string $base): array
+    {
+        $db = 'app_'.substr(preg_replace('/[^a-z0-9]/', '', md5($base.uniqid('', true))), 0, 12);
+        $pass = bin2hex(random_bytes(9));
+        $r = self::run(['mysql', '-e',
+            "CREATE DATABASE IF NOT EXISTS `{$db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; ".
+            "CREATE USER IF NOT EXISTS '{$db}'@'localhost' IDENTIFIED BY '{$pass}'; ".
+            "GRANT ALL PRIVILEGES ON `{$db}`.* TO '{$db}'@'localhost'; FLUSH PRIVILEGES;",
+        ]);
+        if (! $r->successful()) {
+            throw new \RuntimeException('Database setup failed: '.trim($r->errorOutput()));
+        }
+
+        return [$db, $db, $pass];
+    }
+
+    private static function appStatic(string $dir, string $domain): string
+    {
+        $html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">".
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>{$domain}</title>".
+            "<style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#0f0f17;color:#e7e7ef}".
+            ".c{text-align:center}h1{font-weight:600}</style></head><body><div class=\"c\"><h1>{$domain}</h1>".
+            "<p>Your site is ready. Replace this page with your content.</p></div></body></html>";
+        file_put_contents("{$dir}/index.html", $html);
+        @unlink("{$dir}/index.php");
+
+        return 'Static starter page installed';
+    }
+
+    private static function appWordpress(string $dir, string $domain): string
+    {
+        [$db, $user, $pass] = self::createAppDb($domain);
+        $tmp = '/tmp/wp-'.bin2hex(random_bytes(4));
+        mkdir($tmp, 0755, true);
+
+        $dl = self::run(['curl', '-fsSL', 'https://wordpress.org/latest.tar.gz', '-o', "{$tmp}/wp.tgz"], 300);
+        if (! $dl->successful()) {
+            throw new \RuntimeException('WordPress download failed.');
+        }
+        self::run(['tar', '-xzf', "{$tmp}/wp.tgz", '-C', $tmp], 120);
+        self::run(['bash', '-c', 'cp -a '.escapeshellarg("{$tmp}/wordpress").'/. '.escapeshellarg($dir).'/']);
+        @unlink("{$dir}/index.html");
+
+        $salts = trim(self::run(['curl', '-fsSL', 'https://api.wordpress.org/secret-key/1.1/salt/'])->output());
+        if ($salts === '') {
+            $salts = '';
+            foreach (['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'] as $k) {
+                $salts .= "define('{$k}', '".bin2hex(random_bytes(32))."');\n";
+            }
+        }
+        $cfg = "<?php\n".
+            "define('DB_NAME', '{$db}');\n".
+            "define('DB_USER', '{$user}');\n".
+            "define('DB_PASSWORD', '{$pass}');\n".
+            "define('DB_HOST', 'localhost');\n".
+            "define('DB_CHARSET', 'utf8mb4');\n".
+            "define('DB_COLLATE', '');\n".
+            $salts.
+            "\$table_prefix = 'wp_';\n".
+            "define('WP_DEBUG', false);\n".
+            "if (! defined('ABSPATH')) { define('ABSPATH', __DIR__ . '/'); }\n".
+            "require_once ABSPATH . 'wp-settings.php';\n";
+        file_put_contents("{$dir}/wp-config.php", $cfg);
+        self::run(['rm', '-rf', $tmp]);
+
+        return "WordPress installed · finish setup at http://{$domain}/";
+    }
+
+    private static function appPhpMyAdmin(string $dir): string
+    {
+        $ver = '5.2.1';
+        $tmp = '/tmp/pma-'.bin2hex(random_bytes(4));
+        mkdir($tmp, 0755, true);
+        $url = "https://files.phpmyadmin.net/phpMyAdmin/{$ver}/phpMyAdmin-{$ver}-all-languages.tar.gz";
+        $dl = self::run(['curl', '-fsSL', $url, '-o', "{$tmp}/pma.tgz"], 300);
+        if (! $dl->successful()) {
+            throw new \RuntimeException('phpMyAdmin download failed.');
+        }
+        self::run(['tar', '-xzf', "{$tmp}/pma.tgz", '-C', $tmp], 120);
+        self::run(['bash', '-c', 'cp -a '.escapeshellarg("{$tmp}/phpMyAdmin-{$ver}-all-languages")."/. ".escapeshellarg($dir).'/']);
+        @unlink("{$dir}/index.html");
+        $blowfish = bin2hex(random_bytes(16));
+        if (is_file("{$dir}/config.sample.inc.php")) {
+            $cfg = (string) file_get_contents("{$dir}/config.sample.inc.php");
+            $cfg = preg_replace("/\\\$cfg\['blowfish_secret'\] = '';/", "\$cfg['blowfish_secret'] = '{$blowfish}';", $cfg);
+            file_put_contents("{$dir}/config.inc.php", $cfg);
+        }
+        self::run(['rm', '-rf', $tmp]);
+
+        return "phpMyAdmin {$ver} installed";
+    }
+
+    private static function appConvoro(string $dir, string $domain): string
+    {
+        [$db, $user, $pass] = self::createAppDb($domain);
+        $tmp = '/tmp/cv-'.bin2hex(random_bytes(4));
+        $clone = self::run(['git', 'clone', '--depth', '1', 'https://github.com/ernestdefoe/convoro.git', $tmp], 300);
+        if (! $clone->successful()) {
+            throw new \RuntimeException('Convoro clone failed (is the repo public?).');
+        }
+        self::run(['bash', '-c', 'cp -a '.escapeshellarg($tmp).'/. '.escapeshellarg($dir).'/']);
+        self::run(['bash', '-c', 'cd '.escapeshellarg($dir).' && COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer install --no-dev --no-interaction 2>&1'], 600);
+        if (is_file("{$dir}/.env.example")) {
+            copy("{$dir}/.env.example", "{$dir}/.env");
+        }
+        self::run(['bash', '-c', 'cd '.escapeshellarg($dir).' && php8.4 artisan key:generate --force 2>&1']);
+        $env = "{$dir}/.env";
+        if (is_file($env)) {
+            $c = (string) file_get_contents($env);
+            $c = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=mysql', $c);
+            $c = preg_replace('/^DB_DATABASE=.*/m', "DB_DATABASE={$db}", $c);
+            $c = preg_replace('/^DB_USERNAME=.*/m', "DB_USERNAME={$user}", $c);
+            $c = preg_replace('/^DB_PASSWORD=.*/m', "DB_PASSWORD={$pass}", $c);
+            file_put_contents($env, $c);
+        }
+        self::run(['bash', '-c', 'cd '.escapeshellarg($dir).' && php8.4 artisan migrate --force 2>&1'], 300);
+        self::run(['rm', '-rf', $tmp]);
+
+        return "Convoro Forums installed · DB {$db}";
     }
 
     // ---- Services -------------------------------------------------------

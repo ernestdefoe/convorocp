@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AppController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BillingController;
@@ -101,6 +102,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/sites/{site}/files/chmod', [FileController::class, 'chmod'])->name('sites.files.chmod');
     Route::delete('/sites/{site}/files', [FileController::class, 'destroy'])->name('sites.files.destroy');
     Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
+
+    Route::get('/apps', [AppController::class, 'index'])->name('apps.index');
+    Route::post('/apps/install', [AppController::class, 'install'])->name('apps.install');
+    Route::delete('/apps/{app}', [AppController::class, 'destroy'])->name('apps.destroy');
 
     Route::get('/databases', [DatabaseController::class, 'index'])->name('databases.index');
     Route::post('/databases', [DatabaseController::class, 'store'])->name('databases.store');

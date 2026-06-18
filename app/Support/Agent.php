@@ -31,6 +31,7 @@ class Agent
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
         'fail2ban.install', 'fail2ban.unban', 'fail2ban.ban',
         'panel.update',
+        'app.install',
     ];
 
     public static function dispatch(string $op, array $args): AgentOperation

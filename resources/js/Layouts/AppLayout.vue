@@ -15,6 +15,7 @@ const navSets = {
         { key: 'overview', label: 'Overview', icon: 'ti-chart-line', href: '/' },
         { key: 'customers', label: 'Customers', icon: 'ti-users', href: '/customers' },
         { key: 'sites', label: 'Sites', icon: 'ti-world', href: '/sites' },
+        { key: 'apps', label: 'App Installer', icon: 'ti-apps', href: '/apps' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
         { key: 'mail', label: 'Webmail', icon: 'ti-mail', href: '/mail' },
@@ -35,6 +36,7 @@ const navSets = {
     client: [
         { key: 'home', label: 'My hosting', icon: 'ti-home', href: '/' },
         { key: 'sites', label: 'Websites', icon: 'ti-world', href: '/sites' },
+        { key: 'apps', label: 'App Installer', icon: 'ti-apps', href: '/apps' },
         { key: 'mail', label: 'Email', icon: 'ti-mail', href: '/mail' },
         { key: 'databases', label: 'Databases', icon: 'ti-database', href: '/databases' },
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
