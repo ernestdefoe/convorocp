@@ -31,7 +31,7 @@ const navSets = {
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '/billing' },
-        { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '#' },
+        { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '/tickets' },
         { key: 'account', label: 'Account', icon: 'ti-user-shield', href: '/account' },
     ],
     client: [
@@ -44,7 +44,7 @@ const navSets = {
         { key: 'containers', label: 'Docker', icon: 'ti-brand-docker', href: '/containers' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '/billing' },
         { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
-        { key: 'support', label: 'Support', icon: 'ti-lifebuoy', href: '#' },
+        { key: 'tickets', label: 'Support', icon: 'ti-lifebuoy', href: '/tickets' },
         { key: 'account', label: 'Account', icon: 'ti-user-shield', href: '/account' },
     ],
     server: [

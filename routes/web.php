@@ -18,6 +18,7 @@ use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\TerminalController;
+use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\SiteController;
@@ -167,6 +168,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/billing/plans/{plan}', [BillingController::class, 'savePlanPrice'])->name('billing.plan-price');
     Route::post('/billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
     Route::post('/billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
+
+    Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
+    Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+    Route::get('/tickets/{ticket}', [TicketController::class, 'show'])->name('tickets.show');
+    Route::post('/tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('tickets.reply');
+    Route::patch('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.status');
 
     Route::get('/account', [TwoFactorController::class, 'account'])->name('account.index');
     Route::post('/account/2fa/enable', [TwoFactorController::class, 'enable'])->name('account.2fa.enable');
