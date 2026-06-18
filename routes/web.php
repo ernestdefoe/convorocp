@@ -175,10 +175,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('tickets.reply');
     Route::patch('/tickets/{ticket}/status', [TicketController::class, 'updateStatus'])->name('tickets.status');
 
-    Route::get('/account', [TwoFactorController::class, 'account'])->name('account.index');
-    Route::post('/account/2fa/enable', [TwoFactorController::class, 'enable'])->name('account.2fa.enable');
-    Route::post('/account/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('account.2fa.confirm');
-    Route::delete('/account/2fa', [TwoFactorController::class, 'disable'])->name('account.2fa.disable');
+    Route::post('/security/2fa/enable', [TwoFactorController::class, 'enable'])->name('security.2fa.enable');
+    Route::post('/security/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('security.2fa.confirm');
+    Route::delete('/security/2fa', [TwoFactorController::class, 'disable'])->name('security.2fa.disable');
 
     Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
     Route::post('/mail', [MailController::class, 'store'])->name('mail.store');

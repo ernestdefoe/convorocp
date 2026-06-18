@@ -5,9 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\FirewallRule;
 use App\Support\Agent;
 use App\Support\Setting;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Process;
 use Inertia\Inertia;
+use PragmaRX\Google2FA\Google2FA;
 
 class SecurityController extends Controller
 {
@@ -18,13 +23,40 @@ class SecurityController extends Controller
 
     public function index(Request $request)
     {
-        $this->ensureOperator($request);
+        $isOperator = $request->user()->isOperator();
 
         return Inertia::render('Security/Index', [
-            'rules' => FirewallRule::orderBy('port')->get(['id', 'port', 'proto', 'action', 'note']),
-            'enabled' => (bool) Setting::get('firewall.enabled', false),
-            'fail2ban' => $this->fail2banStatus(),
+            'isOperator' => $isOperator,
+            'twoFactor' => $this->twoFactorData($request),
+            // Server-level controls are operator-only.
+            'rules' => $isOperator ? FirewallRule::orderBy('port')->get(['id', 'port', 'proto', 'action', 'note']) : [],
+            'enabled' => $isOperator ? (bool) Setting::get('firewall.enabled', false) : false,
+            'fail2ban' => $isOperator ? $this->fail2banStatus() : ['installed' => false, 'jails' => []],
         ]);
+    }
+
+    /** Personal 2FA state for the current user (manage here, in the Security area). */
+    private function twoFactorData(Request $request): array
+    {
+        $user = $request->user();
+        $pending = ! $user->hasTwoFactorEnabled() && ! empty($user->two_factor_secret);
+
+        $qr = null;
+        $secret = null;
+        if ($pending) {
+            $secret = $user->two_factor_secret;
+            $url = (new Google2FA)->getQRCodeUrl(config('app.name', 'ConvoroCP'), $user->email, $secret);
+            $renderer = new ImageRenderer(new RendererStyle(192, 1), new SvgImageBackEnd);
+            $qr = 'data:image/svg+xml;base64,'.base64_encode((new Writer($renderer))->writeString($url));
+        }
+
+        return [
+            'enabled' => $user->hasTwoFactorEnabled(),
+            'pending' => $pending,
+            'qr' => $qr,
+            'secret' => $secret,
+            'recoveryCodes' => $request->session()->get('recovery_codes'),
+        ];
     }
 
     /**

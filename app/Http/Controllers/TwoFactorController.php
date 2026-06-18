@@ -3,10 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use BaconQrCode\Renderer\Image\SvgImageBackEnd;
-use BaconQrCode\Renderer\ImageRenderer;
-use BaconQrCode\Renderer\RendererStyle\RendererStyle;
-use BaconQrCode\Writer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -21,29 +17,7 @@ class TwoFactorController extends Controller
         return new Google2FA;
     }
 
-    // ---- Account page (manage own 2FA) ---------------------------------
-
-    public function account(Request $request)
-    {
-        $user = $request->user();
-        $pending = ! $user->hasTwoFactorEnabled() && ! empty($user->two_factor_secret);
-
-        $qr = null;
-        $secret = null;
-        if ($pending) {
-            $secret = $user->two_factor_secret;
-            $url = $this->g2fa()->getQRCodeUrl(config('app.name', 'ConvoroCP'), $user->email, $secret);
-            $qr = $this->qrDataUri($url);
-        }
-
-        return Inertia::render('Account/Index', [
-            'enabled' => $user->hasTwoFactorEnabled(),
-            'pending' => $pending,
-            'qr' => $qr,
-            'secret' => $secret,
-            'recoveryCodes' => $request->session()->get('recovery_codes'),
-        ]);
-    }
+    // ---- 2FA management (rendered inside the Security page) -------------
 
     public function enable(Request $request)
     {
@@ -143,13 +117,5 @@ class TwoFactorController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended('/');
-    }
-
-    private function qrDataUri(string $url): string
-    {
-        $renderer = new ImageRenderer(new RendererStyle(192, 1), new SvgImageBackEnd);
-        $svg = (new Writer($renderer))->writeString($url);
-
-        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 }

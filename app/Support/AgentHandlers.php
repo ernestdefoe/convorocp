@@ -380,8 +380,8 @@ class AgentHandlers
 
     private static function firewallEnable(array $args): array
     {
-        // Anti-lockout: always permit SSH + web before enabling.
-        foreach (['22/tcp', '80/tcp', '443/tcp'] as $p) {
+        // Anti-lockout: always permit SSH + web + the panel port before enabling.
+        foreach (['22/tcp', '80/tcp', '443/tcp', '8000/tcp'] as $p) {
             self::run(['ufw', 'allow', $p]);
         }
         $r = self::run(['ufw', '--force', 'enable']);
