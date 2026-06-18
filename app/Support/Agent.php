@@ -24,6 +24,8 @@ class Agent
         'dns.zone.read', 'dns.zone.write', 'dns.reload',
         'cron.write', 'cron.delete', 'cron.run_now',
         'daemon.create', 'daemon.delete', 'daemon.start', 'daemon.stop', 'daemon.restart',
+        'docker.install',
+        'nginx.write', 'php.ini.write',
         'container.run', 'container.start', 'container.stop', 'container.remove',
         'backup.run', 'backup.restore', 'backup.delete',
         'mail.account_create', 'mail.account_delete',

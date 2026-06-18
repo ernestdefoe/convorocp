@@ -1,11 +1,25 @@
 <script setup>
-import { router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
-defineProps({ runtimes: Array });
+defineProps({ runtimes: Array, inis: { type: Array, default: () => [] } });
 
 const install = (r) => router.post(`/php/${r.id}/install`, {}, { preserveScroll: true });
 const uninstall = (r) => { if (confirm(`Remove PHP ${r.version}? Sites using it must be moved first.`)) router.post(`/php/${r.id}/uninstall`, {}, { preserveScroll: true }); };
+
+const flash = () => usePage().props.flash?.status;
+const editing = ref(null);
+const iniForm = useForm({ version: '', content: '' });
+function edit(ini) {
+    if (editing.value === ini.version) { editing.value = null; return; }
+    editing.value = ini.version;
+    iniForm.version = ini.version;
+    iniForm.content = ini.content;
+}
+function saveIni() {
+    iniForm.post('/php/save-ini', { preserveScroll: true });
+}
 
 const badge = {
     installed: 'background:rgba(52,211,153,.16);color:var(--cp-grn)',
@@ -43,5 +57,33 @@ const badge = {
             <i class="ti ti-info-circle" style="font-size: 15px" aria-hidden="true"></i>
             Installs run on the node in the background (apt) — refresh in a minute to see the status update.
         </p>
+
+        <!-- php.ini editors -->
+        <div v-if="inis.length" style="margin-top: 26px">
+            <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px">php.ini</div>
+            <div style="font-size: 12px; color: var(--cp-dim); margin-bottom: 12px">Edit the live FPM php.ini directly. The agent reloads FPM and auto-reverts if it fails to start.</div>
+            <div v-if="flash()" style="background: rgba(52,211,153,.14); border: 1px solid var(--cp-grn); color: var(--cp-grn); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px">{{ flash() }}</div>
+
+            <div v-for="ini in inis" :key="ini.version" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 12px 15px; margin-bottom: 12px">
+                <div style="display: flex; align-items: center; gap: 10px">
+                    <i class="ti ti-file-settings" style="font-size: 17px; color: var(--cp-vio)" aria-hidden="true"></i>
+                    <div style="flex: 1">
+                        <div style="font-size: 13px; font-weight: 600">PHP {{ ini.version }}</div>
+                        <div style="font-size: 11px; color: var(--cp-dim); font-family: ui-monospace, monospace">{{ ini.path }}</div>
+                    </div>
+                    <button type="button" @click="edit(ini)"
+                        style="font-size: 12px; color: var(--cp-mut); background: transparent; border: 1px solid var(--cp-ln); border-radius: 8px; padding: 6px 13px; cursor: pointer; font-family: inherit">{{ editing === ini.version ? 'Close' : 'Edit' }}</button>
+                </div>
+                <div v-if="editing === ini.version" style="margin-top: 12px">
+                    <textarea v-model="iniForm.content" spellcheck="false" rows="20"
+                        style="box-sizing: border-box; width: 100%; background: var(--cp-card2); border: 1px solid var(--cp-ln); border-radius: 9px; color: var(--cp-ink); padding: 11px 12px; font-size: 12px; font-family: ui-monospace, monospace; line-height: 1.5; resize: vertical"></textarea>
+                    <p v-if="iniForm.errors.content" style="color: var(--cp-red); font-size: 12px; margin: 8px 0 0">{{ iniForm.errors.content }}</p>
+                    <div style="margin-top: 10px; display: flex; justify-content: flex-end">
+                        <button type="button" @click="saveIni" :disabled="iniForm.processing"
+                            style="font-size: 12.5px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 9px; padding: 9px 18px; font-weight: 500; cursor: pointer; font-family: inherit">{{ iniForm.processing ? 'Saving…' : 'Save & reload FPM' }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </AppLayout>
 </template>

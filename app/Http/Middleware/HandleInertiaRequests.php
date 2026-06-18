@@ -47,6 +47,10 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'brand' => Branding::data(),
+            'flash' => [
+                'status' => $request->session()->get('status'),
+                'error' => $request->session()->get('error'),
+            ],
         ];
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BackupController;
@@ -95,6 +96,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
     Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');
     Route::patch('/sites/{site}/repo', [SiteController::class, 'updateRepo'])->name('sites.repo');
+    Route::post('/sites/{site}/nginx', [SiteController::class, 'saveNginx'])->name('sites.nginx');
     Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->name('sites.deploy');
     Route::get('/sites/{site}/files', [FileController::class, 'index'])->name('sites.files');
     Route::post('/sites/{site}/files/save', [FileController::class, 'save'])->name('sites.files.save');
@@ -130,6 +132,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}', [CustomerController::class, 'show'])->name('customers.show');
 
+    Route::post('/docker/install', [ContainerController::class, 'installEngine'])->name('containers.install-engine');
     Route::get('/docker/search', [ContainerController::class, 'search'])->name('containers.search');
     Route::get('/containers', [ContainerController::class, 'index'])->name('containers.index');
     Route::post('/containers', [ContainerController::class, 'store'])->name('containers.store');
@@ -185,12 +188,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/security/2fa/confirm', [TwoFactorController::class, 'confirm'])->name('security.2fa.confirm');
     Route::delete('/security/2fa', [TwoFactorController::class, 'disable'])->name('security.2fa.disable');
 
+    Route::get('/account', [AccountController::class, 'index'])->name('account.index');
+    Route::patch('/account/profile', [AccountController::class, 'updateProfile'])->name('account.profile');
+    Route::patch('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
+
     Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
     Route::post('/mail', [MailController::class, 'store'])->name('mail.store');
     Route::post('/mail/{account}/send', [MailController::class, 'send'])->name('mail.send');
     Route::delete('/mail/{account}', [MailController::class, 'destroy'])->name('mail.destroy');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');
+    Route::post('/php/save-ini', [PhpController::class, 'saveIni'])->name('php.save-ini');
     Route::post('/php/{runtime}/install', [PhpController::class, 'install'])->name('php.install');
     Route::post('/php/{runtime}/uninstall', [PhpController::class, 'uninstall'])->name('php.uninstall');
 

@@ -2,7 +2,12 @@
 import { useForm, router, Link } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
-const props = defineProps({ site: Object, phpVersions: Array, disableableFunctions: { type: Array, default: () => [] } });
+const props = defineProps({ site: Object, phpVersions: Array, disableableFunctions: { type: Array, default: () => [] }, nginx: { type: Object, default: null } });
+
+const nginxForm = useForm({ content: props.nginx?.conf ?? '' });
+function saveNginx() {
+    nginxForm.post(`/sites/${props.site.id}/nginx`, { preserveScroll: true });
+}
 
 const php = useForm({ php_version: props.site.php_version });
 function changePhp() {
@@ -118,6 +123,23 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                     <i class="ti" :class="ini.disable_functions.includes(fn) ? 'ti-ban' : 'ti-circle'" style="font-size: 12px; vertical-align: -1px; margin-right: 4px" aria-hidden="true"></i>{{ fn }}
                 </button>
             </div>
+        </div>
+
+        <div v-if="nginx" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 14px 16px; margin-bottom: 14px">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px">
+                <i class="ti ti-server-2" style="color: var(--cp-vio); font-size: 17px" aria-hidden="true"></i>
+                <span style="font-size: 13px; font-weight: 600; flex: 1">nginx vhost</span>
+                <button type="button" @click="saveNginx" :disabled="nginxForm.processing || nginx.conf === null"
+                    style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 6px 14px; font-weight: 500; cursor: pointer; font-family: inherit">{{ nginxForm.processing ? 'Saving…' : 'Save & reload' }}</button>
+            </div>
+            <div style="font-size: 11px; color: var(--cp-dim); font-family: ui-monospace, monospace; margin-bottom: 8px">{{ nginx.path }}</div>
+            <textarea v-if="nginx.conf !== null" v-model="nginxForm.content" spellcheck="false" rows="14"
+                style="box-sizing: border-box; width: 100%; background: var(--cp-card2); border: 1px solid var(--cp-ln); border-radius: 9px; color: var(--cp-ink); padding: 11px 12px; font-size: 12px; font-family: ui-monospace, monospace; line-height: 1.5; resize: vertical"></textarea>
+            <div v-else style="font-size: 12px; color: var(--cp-dim)">No vhost file found at this path yet.</div>
+            <p v-if="nginxForm.errors.content" style="color: var(--cp-red); font-size: 12px; margin: 8px 0 0">{{ nginxForm.errors.content }}</p>
+            <p style="font-size: 11px; color: var(--cp-dim); margin: 9px 0 0; display: flex; align-items: center; gap: 6px">
+                <i class="ti ti-shield-check" style="font-size: 14px" aria-hidden="true"></i>The agent runs <code style="font-family: ui-monospace, monospace">nginx -t</code> before reloading and auto-reverts if the config is invalid.
+            </p>
         </div>
 
         <div style="background: var(--cp-card); border: 1px solid var(--cp-red); border-radius: 13px; padding: 14px 15px; display: flex; align-items: center; gap: 12px">

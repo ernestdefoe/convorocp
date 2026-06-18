@@ -20,7 +20,41 @@ class PhpController extends Controller
 
         return Inertia::render('Php/Index', [
             'runtimes' => PhpRuntime::orderByDesc('version')->get(['id', 'version', 'status']),
+            'inis' => $this->iniFiles(),
         ]);
+    }
+
+    /** The actual fpm php.ini for each installed PHP, read straight off disk. */
+    private function iniFiles(): array
+    {
+        return collect(glob('/etc/php/*/fpm/php.ini') ?: [])
+            ->map(function (string $path) {
+                preg_match('#/etc/php/([\d.]+)/#', $path, $m);
+
+                return [
+                    'version' => $m[1] ?? '?',
+                    'path' => $path,
+                    'content' => is_readable($path) ? (string) file_get_contents($path) : null,
+                ];
+            })
+            ->filter(fn ($x) => $x['content'] !== null)
+            ->sortByDesc('version')
+            ->values()
+            ->all();
+    }
+
+    /** Write a php.ini (operator only) — validated + reloaded by the agent. */
+    public function saveIni(Request $request)
+    {
+        $this->ensureOperator($request);
+        $data = $request->validate([
+            'version' => ['required', 'string', 'regex:/^\d+\.\d+$/'],
+            'content' => ['required', 'string', 'max:200000'],
+        ]);
+
+        Agent::dispatch('php.ini.write', ['version' => $data['version'], 'content' => $data['content']]);
+
+        return back()->with('status', "php.ini for PHP {$data['version']} queued — the agent will validate + reload FPM.");
     }
 
     public function install(Request $request, PhpRuntime $runtime)

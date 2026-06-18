@@ -32,6 +32,7 @@ const navSets = {
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '/billing' },
         { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '/tickets' },
+        { key: 'account', label: 'Account', icon: 'ti-user-cog', href: '/account' },
     ],
     client: [
         { key: 'home', label: 'My hosting', icon: 'ti-home', href: '/' },
@@ -46,6 +47,7 @@ const navSets = {
         { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
         { key: 'tickets', label: 'Support', icon: 'ti-lifebuoy', href: '/tickets' },
         { key: 'security', label: 'Security', icon: 'ti-shield-lock', href: '/security' },
+        { key: 'account', label: 'Account', icon: 'ti-user-cog', href: '/account' },
     ],
     server: [
         { key: 'dashboard', label: 'Dashboard', icon: 'ti-layout-dashboard', href: '/' },
@@ -91,9 +93,9 @@ function logout() {
                 <ThemeToggle />
                 <div style="display: flex; align-items: center; gap: 9px; padding: 8px 9px; border: 1px solid var(--cp-ln); border-radius: 10px; background: var(--cp-card)">
                     <div style="width: 26px; height: 26px; border-radius: 50%; background: var(--cp-vio); display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 600; color: #1a1430">{{ user.initials }}</div>
-                    <div style="line-height: 1.25; flex: 1; min-width: 0">
+                    <a href="/account" style="line-height: 1.25; flex: 1; min-width: 0; text-decoration: none; color: inherit" title="Account settings">
                         <div style="font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ user.name }}</div>
-                    </div>
+                    </a>
                     <button type="button" @click="logout" aria-label="Log out" style="border: 0; background: transparent; color: var(--cp-dim); cursor: pointer; padding: 0">
                         <i class="ti ti-logout" style="font-size: 16px" aria-hidden="true"></i>
                     </button>

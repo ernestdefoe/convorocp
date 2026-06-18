@@ -77,6 +77,16 @@ class SiteController extends Controller
     {
         $this->authorizeSite($request, $site);
 
+        // The raw nginx vhost is shown to operators only (read straight off disk).
+        $nginx = null;
+        if ($request->user()->isOperator()) {
+            $path = "/etc/nginx/sites-available/{$site->domain}";
+            $nginx = [
+                'path' => $path,
+                'conf' => is_readable($path) ? (string) file_get_contents($path) : null,
+            ];
+        }
+
         return Inertia::render('Sites/Show', [
             'site' => [
                 'id' => $site->id,
@@ -94,7 +104,21 @@ class SiteController extends Controller
             ],
             'phpVersions' => \App\Models\PhpRuntime::installed(),
             'disableableFunctions' => Site::DISABLEABLE_FUNCTIONS,
+            'nginx' => $nginx,
         ]);
+    }
+
+    /** Overwrite a site's nginx vhost (operator only) — agent tests + reloads, reverts on error. */
+    public function saveNginx(Request $request, Site $site)
+    {
+        abort_unless($request->user()->isOperator(), 403);
+        $data = $request->validate([
+            'content' => ['required', 'string', 'max:100000'],
+        ]);
+
+        Agent::dispatch('nginx.write', ['domain' => $site->domain, 'content' => $data['content']]);
+
+        return back()->with('status', 'nginx config queued — the agent will test it and reload (auto-reverts if invalid).');
     }
 
     public function setPhp(Request $request, Site $site)

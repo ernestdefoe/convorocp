@@ -3,8 +3,9 @@ import { ref } from 'vue';
 import { useForm, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
-defineProps({ containers: Array });
+defineProps({ containers: Array, dockerInstalled: { type: Boolean, default: true } });
 const isOperator = usePage().props.auth?.user?.role === 'operator';
+const installDocker = () => router.post('/docker/install', {}, { preserveScroll: true });
 
 const showForm = ref(false);
 const form = useForm({ name: '', image: '', container_port: 80, domain: '', restart_policy: 'unless-stopped' });
@@ -38,11 +39,23 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
 <template>
     <AppLayout active="containers" title="Docker" :subtitle="`${containers.length} container${containers.length === 1 ? '' : 's'} · Docker Hub`">
         <template #actions>
-            <button type="button" @click="showForm = !showForm"
+            <button v-if="dockerInstalled" type="button" @click="showForm = !showForm"
                 style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; cursor: pointer; font-family: inherit">
                 <i class="ti ti-plus" style="font-size: 14px" aria-hidden="true"></i>Deploy container
             </button>
         </template>
+
+        <div v-if="!dockerInstalled" style="background: var(--cp-card); border: 1px solid var(--cp-amb); border-radius: 13px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; margin-bottom: 14px">
+            <i class="ti ti-brand-docker" style="font-size: 26px; color: var(--cp-amb)" aria-hidden="true"></i>
+            <div style="flex: 1">
+                <div style="font-size: 13.5px; font-weight: 600">Docker isn't installed on this node</div>
+                <div style="font-size: 12px; color: var(--cp-dim)">The container feature needs the Docker engine. {{ isOperator ? 'Install it to deploy images from Docker Hub.' : 'Ask your operator to install it.' }}</div>
+            </div>
+            <button v-if="isOperator" type="button" @click="installDocker"
+                style="font-size: 12.5px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 9px; padding: 9px 16px; font-weight: 500; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px">
+                <i class="ti ti-download" style="font-size: 15px" aria-hidden="true"></i>Install Docker
+            </button>
+        </div>
 
         <form v-if="showForm" @submit.prevent="create" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 14px 15px; margin-bottom: 14px">
             <div style="display: grid; grid-template-columns: 1fr 1.5fr 90px; gap: 10px">

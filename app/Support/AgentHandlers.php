@@ -47,6 +47,17 @@ class AgentHandlers
         'fail2ban.install' => 'fail2banInstall',
         'fail2ban.unban' => 'fail2banUnban',
         'fail2ban.ban' => 'fail2banBan',
+        'cron.write' => 'cronWrite',
+        'cron.delete' => 'cronDelete',
+        'cron.run_now' => 'cronRunNow',
+        'daemon.create' => 'daemonCreate',
+        'daemon.start' => 'daemonStart',
+        'daemon.stop' => 'daemonStop',
+        'daemon.restart' => 'daemonRestart',
+        'daemon.delete' => 'daemonDelete',
+        'docker.install' => 'dockerInstall',
+        'nginx.write' => 'nginxWrite',
+        'php.ini.write' => 'phpIniWrite',
     ];
 
     /** PHP versions actually installed on this node (detected from /etc/php). */
@@ -1102,6 +1113,219 @@ class AgentHandlers
         self::run(['systemctl', 'reload', 'nginx']);
     }
 
+    // ---- Cron / scheduler ----------------------------------------------
+
+    private static function cronWrite(array $args): array
+    {
+        $id = (int) ($args['id'] ?? 0);
+        $task = \App\Models\ScheduledTask::find($id);
+        if (! $task) {
+            return ['skipped' => true, 'note' => 'task not found'];
+        }
+        $path = "/etc/cron.d/cp-{$id}";
+
+        if (! $task->enabled) {
+            @unlink($path);
+
+            return ['applied' => true, 'disabled' => true];
+        }
+
+        $cron = trim((string) $task->cron);
+        if (! preg_match('/^[\d\*\/,\-\s]+$/', $cron) || count(preg_split('/\s+/', $cron)) !== 5) {
+            throw new \RuntimeException('Invalid cron expression.');
+        }
+        // % is a line separator in crontab — escape so commands survive.
+        $command = str_replace(['%', "\n", "\r"], ['\\%', ' ', ' '], (string) $task->command);
+
+        $body = "# ConvoroCP cron #{$id}: {$task->name}\n"
+            ."PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+            ."{$cron} root {$command}\n";
+        file_put_contents($path, $body);
+        @chmod($path, 0644);
+
+        return ['applied' => true, 'path' => $path];
+    }
+
+    private static function cronDelete(array $args): array
+    {
+        @unlink('/etc/cron.d/cp-'.(int) ($args['id'] ?? 0));
+
+        return ['applied' => true, 'removed' => true];
+    }
+
+    private static function cronRunNow(array $args): array
+    {
+        $id = (int) ($args['id'] ?? 0);
+        $task = \App\Models\ScheduledTask::find($id);
+        $command = (string) ($task->command ?? $args['command'] ?? '');
+        if ($command === '') {
+            throw new \RuntimeException('No command to run.');
+        }
+        $r = self::run(['/bin/bash', '-lc', $command], 120);
+        if ($task) {
+            $task->update(['last_status' => $r->successful() ? 'success' : 'failed']);
+        }
+
+        return [
+            'applied' => true,
+            'exit' => $r->exitCode(),
+            'output' => \Illuminate\Support\Str::limit(trim($r->output()."\n".$r->errorOutput()), 500),
+        ];
+    }
+
+    // ---- Daemons (systemd units) ---------------------------------------
+
+    private static function daemonCreate(array $args): array
+    {
+        $id = (int) ($args['id'] ?? 0);
+        $d = \App\Models\Daemon::find($id);
+        if (! $d) {
+            return ['skipped' => true, 'note' => 'daemon not found'];
+        }
+        $policy = match ($d->restart_policy) {
+            'always' => 'always',
+            'on-failure' => 'on-failure',
+            default => 'no',
+        };
+
+        @mkdir('/opt/convorocp/daemons', 0755, true);
+        $script = "/opt/convorocp/daemons/cp-{$id}.sh";
+        file_put_contents($script, "#!/bin/bash\n".$d->command."\n");
+        @chmod($script, 0755);
+
+        $unit = "[Unit]\nDescription=ConvoroCP daemon #{$id}: {$d->name}\nAfter=network.target\n\n"
+            ."[Service]\nType=simple\nUser=www-data\nGroup=www-data\nWorkingDirectory=/var/www\n"
+            ."ExecStart=/bin/bash {$script}\nRestart={$policy}\nRestartSec=3\n\n"
+            ."[Install]\nWantedBy=multi-user.target\n";
+        file_put_contents("/etc/systemd/system/cp-daemon-{$id}.service", $unit);
+
+        self::run(['systemctl', 'daemon-reload']);
+        $r = self::run(['systemctl', 'enable', '--now', "cp-daemon-{$id}.service"]);
+        if (! $r->successful()) {
+            throw new \RuntimeException('daemon failed to start: '.trim($r->errorOutput()));
+        }
+
+        return ['applied' => true, 'unit' => "cp-daemon-{$id}.service"];
+    }
+
+    private static function daemonStart(array $args): array
+    {
+        self::run(['systemctl', 'start', 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service']);
+
+        return ['applied' => true];
+    }
+
+    private static function daemonStop(array $args): array
+    {
+        self::run(['systemctl', 'stop', 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service']);
+
+        return ['applied' => true];
+    }
+
+    private static function daemonRestart(array $args): array
+    {
+        self::run(['systemctl', 'restart', 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service']);
+
+        return ['applied' => true];
+    }
+
+    private static function daemonDelete(array $args): array
+    {
+        $id = (int) ($args['id'] ?? 0);
+        self::run(['systemctl', 'disable', '--now', "cp-daemon-{$id}.service"]);
+        @unlink("/etc/systemd/system/cp-daemon-{$id}.service");
+        @unlink("/opt/convorocp/daemons/cp-{$id}.sh");
+        self::run(['systemctl', 'daemon-reload']);
+
+        return ['applied' => true, 'removed' => true];
+    }
+
+    // ---- Docker engine --------------------------------------------------
+
+    private static function dockerInstall(array $args): array
+    {
+        $present = trim((string) self::run(['bash', '-lc', 'command -v docker'])->output()) !== '';
+        if ($present) {
+            self::run(['systemctl', 'enable', '--now', 'docker']);
+
+            return ['applied' => true, 'already' => true];
+        }
+
+        self::run(['apt-get', 'update', '-q'], 300, ['DEBIAN_FRONTEND' => 'noninteractive']);
+        $r = self::run(['apt-get', 'install', '-y', '-q', 'docker.io'], 600, ['DEBIAN_FRONTEND' => 'noninteractive']);
+        if (! $r->successful()) {
+            throw new \RuntimeException('docker install failed: '.trim($r->errorOutput()));
+        }
+        self::run(['systemctl', 'enable', '--now', 'docker']);
+
+        return ['applied' => true, 'version' => trim((string) self::run(['bash', '-lc', 'docker --version'])->output())];
+    }
+
+    // ---- Raw config editors (nginx vhost / php.ini) --------------------
+
+    private static function nginxWrite(array $args): array
+    {
+        $domain = self::domain($args);
+        $content = (string) ($args['content'] ?? '');
+        if (trim($content) === '') {
+            throw new \RuntimeException('Refusing to write an empty nginx config.');
+        }
+        $path = "/etc/nginx/sites-available/{$domain}";
+        $backup = $path.'.cpbak';
+        if (is_file($path)) {
+            copy($path, $backup);
+        }
+        file_put_contents($path, rtrim($content, "\n")."\n");
+        if (! file_exists("/etc/nginx/sites-enabled/{$domain}")) {
+            @symlink($path, "/etc/nginx/sites-enabled/{$domain}");
+        }
+
+        $test = self::run(['nginx', '-t']);
+        if (! $test->successful()) {
+            if (is_file($backup)) {
+                copy($backup, $path);
+            } else {
+                @unlink($path);
+                @unlink("/etc/nginx/sites-enabled/{$domain}");
+            }
+
+            throw new \RuntimeException('nginx config invalid — reverted: '.trim($test->errorOutput()));
+        }
+        self::run(['systemctl', 'reload', 'nginx']);
+
+        return ['applied' => true, 'path' => $path];
+    }
+
+    private static function phpIniWrite(array $args): array
+    {
+        $v = (string) ($args['version'] ?? '');
+        if (! in_array($v, self::installedVersions(), true)) {
+            throw new \RuntimeException('Unknown PHP version.');
+        }
+        $content = (string) ($args['content'] ?? '');
+        if (trim($content) === '') {
+            throw new \RuntimeException('Refusing to write an empty php.ini.');
+        }
+        $path = "/etc/php/{$v}/fpm/php.ini";
+        $backup = $path.'.cpbak';
+        if (is_file($path)) {
+            copy($path, $backup);
+        }
+        file_put_contents($path, $content);
+
+        $r = self::run(['systemctl', 'reload', "php{$v}-fpm"]);
+        if (! $r->successful()) {
+            if (is_file($backup)) {
+                copy($backup, $path);
+                self::run(['systemctl', 'reload', "php{$v}-fpm"]);
+            }
+
+            throw new \RuntimeException("php{$v}-fpm reload failed — reverted: ".trim($r->errorOutput()));
+        }
+
+        return ['applied' => true, 'path' => $path];
+    }
+
     // ---- Templates / helpers --------------------------------------------
 
     private static function domain(array $args): string
@@ -1195,6 +1419,9 @@ class AgentHandlers
             str_starts_with($op, 'fail2ban.') => 'fail2ban '.substr($op, 9).' '.($args['ip'] ?? ''),
             $op === 'php.install' => 'install PHP '.($args['version'] ?? '?').' (apt)',
             $op === 'php.uninstall' => 'remove PHP '.($args['version'] ?? '?'),
+            $op === 'docker.install' => 'install the Docker engine (apt)',
+            $op === 'nginx.write' => "write + test + reload nginx vhost for {$d}",
+            $op === 'php.ini.write' => 'write php.ini for PHP '.($args['version'] ?? '?').' + reload',
             default => "apply {$op}",
         };
     }

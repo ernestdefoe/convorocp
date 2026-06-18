@@ -34,7 +34,27 @@ class ContainerController extends Controller
             'owner' => $c->owner?->name,
         ]);
 
-        return Inertia::render('Containers/Index', ['containers' => $containers]);
+        return Inertia::render('Containers/Index', [
+            'containers' => $containers,
+            'dockerInstalled' => self::dockerInstalled(),
+        ]);
+    }
+
+    /** Is the Docker engine present on this node? */
+    private static function dockerInstalled(): bool
+    {
+        return is_executable('/usr/bin/docker') || is_executable('/usr/local/bin/docker');
+    }
+
+    /** Install the Docker engine (operator only). */
+    public function installEngine(Request $request)
+    {
+        abort_unless($request->user()->isOperator(), 403);
+        if (! self::dockerInstalled()) {
+            Agent::dispatch('docker.install', []);
+        }
+
+        return back()->with('status', 'Installing Docker — runs in the background; refresh in a minute.');
     }
 
     /** Live Docker Hub image search (proxied server-side to avoid CORS). */
