@@ -89,7 +89,10 @@ class AgentHandlers
         if (! preg_match('/^[a-z0-9.-]+$/i', $domain) || str_contains($domain, '..')) {
             throw new \RuntimeException('Invalid domain.');
         }
-        $runtime = in_array(($args['runtime'] ?? 'php'), ['php', 'static', 'node'], true) ? $args['runtime'] : 'php';
+        $runtime = $args['runtime'] ?? 'php';
+        if (! in_array($runtime, ['php', 'static', 'node'], true)) {
+            $runtime = 'php';
+        }
         $php = in_array(($args['php'] ?? ''), self::installedVersions(), true) ? $args['php'] : self::installedVersions()[0];
 
         $base = "/var/www/sites/{$domain}";
