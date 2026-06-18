@@ -64,6 +64,7 @@ Route::middleware('auth')->get('/', function (Request $request) {
                 ['label' => 'Nodes', 'value' => '1', 'sub' => 'all healthy', 'tone' => 'mut'],
                 ['label' => 'Sites', 'value' => (string) \App\Models\Site::count(), 'sub' => 'hosted', 'tone' => 'mut'],
             ],
+            'customersTotal' => $clients->count(),
             'customers' => $clients->sortByDesc('created_at')->take(5)->map(fn ($u) => [
                 'name' => $u->name,
                 'initials' => $initials($u->name),
@@ -72,6 +73,11 @@ Route::middleware('auth')->get('/', function (Request $request) {
                 'node' => 'web-01',
                 'mrr' => '$'.number_format(($u->plan?->price_cents ?? 0) / 100, 0),
             ])->values(),
+            'plans' => \App\Models\Plan::orderBy('price_cents')->get()->map(fn ($p) => [
+                'name' => $p->name,
+                'subs' => \App\Models\User::where('plan_id', $p->id)->count(),
+                'price' => '$'.number_format($p->price_cents / 100, 0).'/mo',
+            ]),
             'node' => \App\Support\NodeInfo::detail(),
         ]);
     }
@@ -120,12 +126,14 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/scheduler', [SchedulerController::class, 'index'])->name('scheduler.index');
     Route::post('/scheduler', [SchedulerController::class, 'store'])->name('scheduler.store');
+    Route::post('/scheduler/adopt', [SchedulerController::class, 'adopt'])->name('scheduler.adopt');
     Route::patch('/scheduler/{task}/toggle', [SchedulerController::class, 'toggle'])->name('scheduler.toggle');
     Route::post('/scheduler/{task}/run', [SchedulerController::class, 'run'])->name('scheduler.run');
     Route::delete('/scheduler/{task}', [SchedulerController::class, 'destroy'])->name('scheduler.destroy');
 
     Route::get('/daemons', [DaemonController::class, 'index'])->name('daemons.index');
     Route::post('/daemons', [DaemonController::class, 'store'])->name('daemons.store');
+    Route::post('/daemons/adopt', [DaemonController::class, 'adopt'])->name('daemons.adopt');
     Route::post('/daemons/{daemon}/{action}', [DaemonController::class, 'action'])->name('daemons.action');
     Route::delete('/daemons/{daemon}', [DaemonController::class, 'destroy'])->name('daemons.destroy');
 

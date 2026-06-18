@@ -1218,23 +1218,34 @@ class AgentHandlers
         return ['applied' => true, 'unit' => "cp-daemon-{$id}.service"];
     }
 
+    /** Resolve the systemd unit an action targets — the adopted one if given, else cp-managed. */
+    private static function daemonUnitArg(array $args): string
+    {
+        $unit = (string) ($args['unit'] ?? '');
+        if ($unit !== '' && preg_match('/^[a-z0-9@._-]+\.service$/i', $unit)) {
+            return $unit;
+        }
+
+        return 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service';
+    }
+
     private static function daemonStart(array $args): array
     {
-        self::run(['systemctl', 'start', 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service']);
+        self::run(['systemctl', 'start', self::daemonUnitArg($args)]);
 
         return ['applied' => true];
     }
 
     private static function daemonStop(array $args): array
     {
-        self::run(['systemctl', 'stop', 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service']);
+        self::run(['systemctl', 'stop', self::daemonUnitArg($args)]);
 
         return ['applied' => true];
     }
 
     private static function daemonRestart(array $args): array
     {
-        self::run(['systemctl', 'restart', 'cp-daemon-'.(int) ($args['id'] ?? 0).'.service']);
+        self::run(['systemctl', 'restart', self::daemonUnitArg($args)]);
 
         return ['applied' => true];
     }

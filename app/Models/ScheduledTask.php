@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScheduledTask extends Model
 {
-    protected $fillable = ['user_id', 'name', 'command', 'cron', 'enabled', 'last_status'];
+    protected $fillable = ['user_id', 'name', 'command', 'cron', 'enabled', 'last_status', 'adopted', 'cron_file'];
 
-    protected $casts = ['enabled' => 'boolean'];
+    protected $casts = ['enabled' => 'boolean', 'adopted' => 'boolean'];
 
     public function owner(): BelongsTo
     {

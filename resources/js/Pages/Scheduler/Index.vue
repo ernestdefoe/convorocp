@@ -1,29 +1,50 @@
 <script setup>
 import { ref } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
+import { useForm, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
 defineProps({ tasks: Array });
+const isOperator = usePage().props.auth?.user?.role === 'operator';
 
 const showForm = ref(false);
 const form = useForm({ name: '', command: '', cron: '0 3 * * *' });
 function create() {
     form.post('/scheduler', { onSuccess: () => { showForm.value = false; form.reset(); } });
 }
+
+const showAdopt = ref(false);
+const adoptForm = useForm({ name: '', command: '', cron: '* * * * *', cron_file: '' });
+function adopt() {
+    adoptForm.post('/scheduler/adopt', { onSuccess: () => { showAdopt.value = false; adoptForm.reset(); } });
+}
+
 const toggle = (t) => router.patch(`/scheduler/${t.id}/toggle`, {}, { preserveScroll: true });
 const run = (t) => router.post(`/scheduler/${t.id}/run`, {}, { preserveScroll: true });
-const destroy = (t) => { if (confirm(`Delete task "${t.name}"?`)) router.delete(`/scheduler/${t.id}`); };
+const destroy = (t) => { if (confirm(t.adopted ? `Detach "${t.name}" from the panel? The real cron keeps running.` : `Delete task "${t.name}"?`)) router.delete(`/scheduler/${t.id}`); };
 const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid var(--cp-ln);border-radius:9px;color:var(--cp-ink);padding:9px 11px;font-size:13px;font-family:inherit';
 </script>
 
 <template>
     <AppLayout active="scheduler" title="Scheduler" :subtitle="`${tasks.length} task${tasks.length === 1 ? '' : 's'} · UTC`">
         <template #actions>
+            <button v-if="isOperator" type="button" @click="showAdopt = !showAdopt"
+                style="font-size: 12px; color: var(--cp-mut); background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: inherit; margin-right: 8px">
+                <i class="ti ti-link" style="font-size: 14px" aria-hidden="true"></i>Adopt existing
+            </button>
             <button type="button" @click="showForm = !showForm"
                 style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; cursor: pointer; font-family: inherit">
                 <i class="ti ti-plus" style="font-size: 14px" aria-hidden="true"></i>New task
             </button>
         </template>
+
+        <form v-if="showAdopt" @submit.prevent="adopt" style="background: var(--cp-card); border: 1px solid var(--cp-ind); border-radius: 13px; padding: 14px 15px; margin-bottom: 14px; display: grid; grid-template-columns: 1fr 1.4fr 120px 1.4fr auto; gap: 10px; align-items: end">
+            <div style="grid-column: 1 / -1; font-size: 11.5px; color: var(--cp-dim)">Register a cron ConvoroCP didn't create — shown + runnable here; the panel never rewrites its file.</div>
+            <label style="font-size: 11.5px; color: var(--cp-mut)">Name<input v-model="adoptForm.name" :style="field + ';width:100%;margin-top:5px'" placeholder="Convoro scheduler" /></label>
+            <label style="font-size: 11.5px; color: var(--cp-mut)">Command<input v-model="adoptForm.command" :style="field + ';width:100%;margin-top:5px'" placeholder="php artisan schedule:run" /></label>
+            <label style="font-size: 11.5px; color: var(--cp-mut)">Cron<input v-model="adoptForm.cron" :style="field + ';width:100%;margin-top:5px;font-family:ui-monospace,monospace'" /></label>
+            <label style="font-size: 11.5px; color: var(--cp-mut)">Cron file<input v-model="adoptForm.cron_file" :style="field + ';width:100%;margin-top:5px;font-family:ui-monospace,monospace'" placeholder="/etc/cron.d/convoro-scheduler" /></label>
+            <button type="submit" :disabled="adoptForm.processing" style="background: var(--cp-ind); color: #fff; border: 0; border-radius: 9px; padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit">Adopt</button>
+        </form>
 
         <form v-if="showForm" @submit.prevent="create" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 14px 15px; margin-bottom: 14px; display: grid; grid-template-columns: 1fr 1.6fr 140px auto; gap: 10px; align-items: end">
             <label style="font-size: 11.5px; color: var(--cp-mut)">Name<input v-model="form.name" :style="field + ';width:100%;margin-top:5px'" placeholder="Nightly backup" /></label>
@@ -38,11 +59,14 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 :style="`display:flex;align-items:center;gap:12px;padding:12px 15px;font-size:13px;${i < tasks.length - 1 ? 'border-bottom:1px solid var(--cp-ln)' : ''}`">
                 <span :style="`width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${t.last_status === 'failed' ? 'var(--cp-red)' : t.enabled ? 'var(--cp-grn)' : 'var(--cp-dim)'}`"></span>
                 <div style="flex: 1; min-width: 0">
-                    <div style="font-weight: 500">{{ t.name }}</div>
+                    <div style="font-weight: 500">{{ t.name }}
+                        <span v-if="t.adopted" style="font-size: 10px; font-weight: 600; letter-spacing: .03em; color: var(--cp-vio); background: rgba(91,91,214,.16); padding: 1px 7px; border-radius: 999px; margin-left: 4px">ADOPTED</span>
+                    </div>
                     <div style="font-size: 11px; color: var(--cp-dim); font-family: ui-monospace, monospace">{{ t.cron }} · {{ t.command }}</div>
                 </div>
                 <button type="button" @click="run(t)" aria-label="Run now" style="border: 0; background: transparent; color: var(--cp-mut); cursor: pointer; padding: 0"><i class="ti ti-player-play" style="font-size: 16px" aria-hidden="true"></i></button>
-                <button type="button" @click="toggle(t)" :aria-label="t.enabled ? 'Disable' : 'Enable'"
+                <span v-if="t.adopted" style="font-size: 10.5px; color: var(--cp-dim); display: inline-flex; align-items: center; gap: 4px"><i class="ti ti-external-link" style="font-size: 13px" aria-hidden="true"></i>external</span>
+                <button v-else type="button" @click="toggle(t)" :aria-label="t.enabled ? 'Disable' : 'Enable'"
                     :style="`width:34px;height:19px;border:0;border-radius:999px;position:relative;cursor:pointer;flex-shrink:0;background:${t.enabled ? 'var(--cp-ind)' : 'var(--cp-ln2)'}`">
                     <span :style="`position:absolute;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;${t.enabled ? 'right:2px' : 'left:2px'}`"></span>
                 </button>

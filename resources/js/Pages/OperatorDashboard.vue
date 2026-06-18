@@ -1,7 +1,7 @@
 <script setup>
 import AppLayout from '../Layouts/AppLayout.vue';
 
-defineProps({ metrics: Array, customers: Array, node: Object });
+defineProps({ metrics: Array, customers: Array, node: Object, plans: { type: Array, default: () => [] }, customersTotal: { type: Number, default: 0 } });
 
 const tone = (t) => ({ grn: 'var(--cp-grn)', amb: 'var(--cp-amb)', cy: 'var(--cp-cy)', mut: 'var(--cp-mut)' }[t] || 'var(--cp-mut)');
 const planStyle = (p) => ({
@@ -29,7 +29,7 @@ const planStyle = (p) => ({
         <div style="border: 1px solid var(--cp-ln); border-radius: 13px; overflow: hidden; background: var(--cp-card); margin-bottom: 14px">
             <div style="display: flex; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--cp-ln)">
                 <span style="font-size: 13px; font-weight: 600; flex: 1">Customers</span>
-                <span style="font-size: 11.5px; color: var(--cp-dim)">142 total</span>
+                <span style="font-size: 11.5px; color: var(--cp-dim)">{{ customersTotal }} total</span>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 92px 50px 70px 60px; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--cp-ln); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--cp-dim)">
                 <span>Customer</span><span>Plan</span><span>Sites</span><span>Node</span><span style="text-align: right">MRR</span>
@@ -46,12 +46,14 @@ const planStyle = (p) => ({
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px">
-            <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px">
+        <div :style="`display:grid;grid-template-columns:${plans.length ? '1fr 1fr' : '1fr'};gap:14px`">
+            <div v-if="plans.length" style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px">
                 <div style="font-size: 13px; font-weight: 600; margin-bottom: 11px">Plans</div>
-                <div style="display: flex; gap: 8px; font-size: 12.5px; margin-bottom: 9px"><span style="flex: 1">Starter</span><span style="color: var(--cp-dim)">38 subs</span><span style="font-weight: 500">$12/mo</span></div>
-                <div style="display: flex; gap: 8px; font-size: 12.5px; margin-bottom: 9px"><span style="flex: 1">Pro</span><span style="color: var(--cp-dim)">74 subs</span><span style="font-weight: 500">$45/mo</span></div>
-                <div style="display: flex; gap: 8px; font-size: 12.5px"><span style="flex: 1">Business</span><span style="color: var(--cp-dim)">30 subs</span><span style="font-weight: 500">$120/mo</span></div>
+                <div v-for="(p, i) in plans" :key="p.name" :style="`display:flex;gap:8px;font-size:12.5px;${i < plans.length - 1 ? 'margin-bottom:9px' : ''}`">
+                    <span style="flex: 1">{{ p.name }}</span>
+                    <span style="color: var(--cp-dim)">{{ p.subs }} {{ p.subs === 1 ? 'sub' : 'subs' }}</span>
+                    <span style="font-weight: 500">{{ p.price }}</span>
+                </div>
             </div>
             <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px">
                 <div style="display: flex; align-items: center; margin-bottom: 12px"><span style="font-size: 13px; font-weight: 600; flex: 1">{{ node.name }} · node health</span><span style="font-size: 11px; color: var(--cp-grn); display: inline-flex; align-items: center; gap: 4px"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--cp-grn)"></span>up {{ node.metrics.uptime }}</span></div>

@@ -30,9 +30,39 @@ class DaemonController extends Controller
             'status' => $d->status,
             'autostart' => $d->autostart,
             'restart_policy' => $d->restart_policy,
+            'adopted' => $d->adopted,
+            'unit' => $d->unitName(),
         ]);
 
         return Inertia::render('Daemons/Index', ['daemons' => $daemons]);
+    }
+
+    /**
+     * Adopt an existing systemd unit ConvoroCP didn't create (operator only).
+     * The panel controls/monitors the real unit; it never writes a new one.
+     */
+    public function adopt(Request $request)
+    {
+        abort_unless($request->user()->isOperator(), 403);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'unit' => ['required', 'string', 'max:191', 'regex:/^[a-z0-9@._-]+(\.service)?$/i'],
+            'command' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $unit = str_ends_with($data['unit'], '.service') ? $data['unit'] : $data['unit'].'.service';
+        Daemon::create([
+            'user_id' => $request->user()->id,
+            'name' => $data['name'],
+            'command' => $data['command'] ?: '(external unit)',
+            'status' => 'running',
+            'autostart' => true,
+            'restart_policy' => 'always',
+            'adopted' => true,
+            'unit' => $unit,
+        ]);
+
+        return redirect('/daemons');
     }
 
     public function store(Request $request)
@@ -59,7 +89,7 @@ class DaemonController extends Controller
         abort_unless(in_array($action, ['start', 'stop', 'restart'], true), 404);
 
         $daemon->update(['status' => $action === 'stop' ? 'stopped' : 'running']);
-        Agent::dispatch("daemon.{$action}", ['id' => $daemon->id]);
+        Agent::dispatch("daemon.{$action}", ['id' => $daemon->id, 'unit' => $daemon->unitName()]);
 
         return back();
     }
@@ -67,7 +97,10 @@ class DaemonController extends Controller
     public function destroy(Request $request, Daemon $daemon)
     {
         $this->authorizeDaemon($request, $daemon);
-        Agent::dispatch('daemon.delete', ['id' => $daemon->id]);
+        // Adopted daemons are only detached (forgotten by the panel) — the real unit is left running.
+        if (! $daemon->adopted) {
+            Agent::dispatch('daemon.delete', ['id' => $daemon->id]);
+        }
         $daemon->delete();
 
         return redirect('/daemons');
