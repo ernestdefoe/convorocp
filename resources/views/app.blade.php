@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title inertia>ConvoroCP</title>
+    <title inertia>{{ \App\Support\Branding::data()['name'] }}</title>
+    <style>:root{ --cp-ind: {{ \App\Support\Branding::accent() }}; --cp-vio: {{ \App\Support\Branding::accent() }}; }</style>
     <script>
         (function () {
             try {

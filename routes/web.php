@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BrandingController;
 use App\Http\Controllers\ContainerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
@@ -133,6 +134,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
     Route::post('/backups/{backup}/restore', [BackupController::class, 'restore'])->name('backups.restore');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
+
+    Route::get('/branding', [BrandingController::class, 'index'])->name('branding.index');
+    Route::post('/branding', [BrandingController::class, 'save'])->name('branding.save');
+    Route::post('/branding/logo', [BrandingController::class, 'uploadLogo'])->name('branding.logo');
+    Route::delete('/branding/logo', [BrandingController::class, 'removeLogo'])->name('branding.logo.remove');
 
     Route::get('/updates', [UpdateController::class, 'index'])->name('updates.index');
     Route::post('/updates/check', [UpdateController::class, 'check'])->name('updates.check');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Branding;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -45,6 +46,7 @@ class HandleInertiaRequests extends Middleware
                     'initials' => collect(explode(' ', $request->user()->name))->map(fn ($p) => mb_substr($p, 0, 1))->take(2)->implode(''),
                 ] : null,
             ],
+            'brand' => Branding::data(),
         ];
     }
 }

@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
 
+const brand = computed(() => usePage().props.brand ?? { name: 'ConvoroCP', logo: null });
 const useRecovery = ref(false);
 const form = useForm({ code: '', recovery_code: '' });
 
@@ -16,10 +17,11 @@ const field = 'width:100%;box-sizing:border-box;margin-top:6px;background:var(--
     <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--cp-bg)">
         <div style="width: 380px; max-width: 100%">
             <div style="display: flex; align-items: center; gap: 11px; justify-content: center; margin-bottom: 22px">
-                <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--cp-ind); display: flex; align-items: center; justify-content: center">
+                <img v-if="brand.logo" :src="brand.logo" :alt="brand.name" style="width: 34px; height: 34px; border-radius: 10px; object-fit: contain" />
+                <div v-else style="width: 34px; height: 34px; border-radius: 10px; background: var(--cp-ind); display: flex; align-items: center; justify-content: center">
                     <i class="ti ti-shield-lock" style="font-size: 20px; color: #fff" aria-hidden="true"></i>
                 </div>
-                <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em">ConvoroCP</span>
+                <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em">{{ brand.name }}</span>
             </div>
             <div style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 16px; padding: 24px">
                 <div style="font-size: 16px; font-weight: 600; margin-bottom: 6px">Two-factor authentication</div>

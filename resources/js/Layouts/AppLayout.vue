@@ -27,6 +27,7 @@ const navSets = {
         { key: 'terminal', label: 'Terminal', icon: 'ti-terminal-2', href: '/terminal' },
         { key: 'security', label: 'Security', icon: 'ti-shield-lock', href: '/security' },
         { key: 'updates', label: 'Updates', icon: 'ti-refresh-alert', href: '/updates' },
+        { key: 'branding', label: 'Branding', icon: 'ti-palette', href: '/branding' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
         { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '#' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '/billing' },
@@ -62,6 +63,7 @@ const nav = computed(() => navSets[effVariant.value] ?? navSets.server);
 const activeKey = computed(() => props.active || nav.value[0].key);
 const tag = computed(() => (effVariant.value === 'operator' ? 'OPERATOR' : effVariant.value === 'client' ? 'CLIENT' : ''));
 const user = computed(() => usePage().props.auth?.user ?? { name: 'User', initials: 'U' });
+const brand = computed(() => usePage().props.brand ?? { name: 'ConvoroCP', logo: null });
 
 function logout() {
     router.post('/logout');
@@ -72,11 +74,12 @@ function logout() {
     <div style="display: flex; min-height: 100vh; background: var(--cp-bg)">
         <aside style="width: 200px; flex-shrink: 0; background: var(--cp-side); border-right: 1px solid var(--cp-ln); padding: 16px 12px; display: flex; flex-direction: column; gap: 3px">
             <div style="display: flex; align-items: center; gap: 9px; padding: 4px 8px 14px">
-                <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--cp-ind); display: flex; align-items: center; justify-content: center">
+                <img v-if="brand.logo" :src="brand.logo" :alt="brand.name" style="width: 28px; height: 28px; border-radius: 8px; object-fit: contain" />
+                <div v-else style="width: 28px; height: 28px; border-radius: 8px; background: var(--cp-ind); display: flex; align-items: center; justify-content: center">
                     <i class="ti ti-sailboat" style="font-size: 17px; color: #fff" aria-hidden="true"></i>
                 </div>
                 <div style="line-height: 1.1">
-                    <div style="font-size: 15px; font-weight: 600; letter-spacing: -0.02em">ConvoroCP</div>
+                    <div style="font-size: 15px; font-weight: 600; letter-spacing: -0.02em">{{ brand.name }}</div>
                     <div v-if="tag" style="font-size: 9.5px; font-weight: 500; color: var(--cp-vio)">{{ tag }}</div>
                 </div>
             </div>
