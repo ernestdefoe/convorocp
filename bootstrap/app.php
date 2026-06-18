@@ -15,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
-        $middleware->validateCsrfTokens(except: ['deploy-hook/*']);
+        $middleware->validateCsrfTokens(except: ['deploy-hook/*', 'billing/webhook']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

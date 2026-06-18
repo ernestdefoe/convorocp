@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ContainerController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DaemonController;
@@ -38,6 +39,9 @@ Route::post('/two-factor-challenge', [TwoFactorController::class, 'challengeVeri
 
 // Public auto-deploy webhook (git host posts here on push; token-gated, CSRF-exempt).
 Route::post('/deploy-hook/{site}/{token}', [SiteController::class, 'webhook'])->name('sites.webhook');
+
+// Stripe webhook — signature-verified, CSRF-exempt, no auth.
+Route::post('/billing/webhook', [BillingController::class, 'webhook'])->name('billing.webhook');
 
 // nginx auth_request target gating the ttyd web-terminal proxy (operator-only).
 // Kept outside the 'auth' group so it returns a bare 401/403, never a redirect.
@@ -146,6 +150,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
 
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
+
+    Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::post('/billing/keys', [BillingController::class, 'saveKeys'])->name('billing.keys');
+    Route::post('/billing/test', [BillingController::class, 'testConnection'])->name('billing.test');
+    Route::patch('/billing/plans/{plan}', [BillingController::class, 'savePlanPrice'])->name('billing.plan-price');
+    Route::post('/billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::post('/billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
 
     Route::get('/account', [TwoFactorController::class, 'account'])->name('account.index');
     Route::post('/account/2fa/enable', [TwoFactorController::class, 'enable'])->name('account.2fa.enable');

@@ -8,7 +8,7 @@ class Plan extends Model
 {
     protected $fillable = [
         'name', 'slug', 'price_cents', 'sites_limit', 'db_limit',
-        'email_limit', 'disk_mb', 'is_public', 'position',
+        'email_limit', 'disk_mb', 'is_public', 'position', 'stripe_price_id',
     ];
 
     protected $casts = ['is_public' => 'boolean'];
