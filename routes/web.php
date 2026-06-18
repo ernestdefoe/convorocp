@@ -10,7 +10,6 @@ use App\Http\Controllers\DaemonController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DnsController;
 use App\Http\Controllers\FileController;
-use App\Http\Controllers\NodeController;
 use App\Http\Controllers\MailController;
 use App\Http\Controllers\PhpController;
 use App\Http\Controllers\PlanController;
@@ -71,7 +70,7 @@ Route::middleware('auth')->get('/', function (Request $request) {
                 'node' => 'web-01',
                 'mrr' => '$'.number_format(($u->plan?->price_cents ?? 0) / 100, 0),
             ])->values(),
-            'node' => \App\Support\ServerMetrics::snapshot(),
+            'node' => \App\Support\NodeInfo::detail(),
         ]);
     }
 
@@ -140,8 +139,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
     Route::post('/backups/{backup}/restore', [BackupController::class, 'restore'])->name('backups.restore');
     Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
-
-    Route::get('/nodes', [NodeController::class, 'index'])->name('nodes.index');
 
     Route::get('/branding', [BrandingController::class, 'index'])->name('branding.index');
     Route::post('/branding', [BrandingController::class, 'save'])->name('branding.save');

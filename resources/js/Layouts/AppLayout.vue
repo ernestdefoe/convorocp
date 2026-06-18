@@ -29,7 +29,6 @@ const navSets = {
         { key: 'updates', label: 'Updates', icon: 'ti-refresh-alert', href: '/updates' },
         { key: 'branding', label: 'Branding', icon: 'ti-palette', href: '/branding' },
         { key: 'plans', label: 'Plans', icon: 'ti-tag', href: '/plans' },
-        { key: 'nodes', label: 'Nodes', icon: 'ti-server-2', href: '/nodes' },
         { key: 'billing', label: 'Billing', icon: 'ti-credit-card', href: '/billing' },
         { key: 'tickets', label: 'Tickets', icon: 'ti-lifebuoy', href: '/tickets' },
         { key: 'account', label: 'Account', icon: 'ti-user-shield', href: '/account' },
