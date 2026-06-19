@@ -711,9 +711,11 @@ class AgentHandlers
             throw new \RuntimeException('Archive empty.');
         }
 
-        // Sync new code in, preserving runtime state. public/build is excluded
+        // Sync new code in, preserving runtime state. NB: exclude only the
+        // sqlite DB file, NOT all of database/ — new migrations live there and
+        // must ship so `migrate` has something to run. public/build is excluded
         // here (the code tarball has no built assets) and replaced below.
-        $excludes = ['.env', 'storage', 'database', 'bootstrap/cache', 'public/build', '.git', 'node_modules', 'vendor'];
+        $excludes = ['.env', 'storage', 'database/database.sqlite*', 'bootstrap/cache', 'public/build', '.git', 'node_modules', 'vendor'];
         $rsync = ['rsync', '-a', '--delete'];
         foreach ($excludes as $e) {
             $rsync[] = '--exclude';
