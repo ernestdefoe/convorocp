@@ -711,7 +711,8 @@ class AgentHandlers
             throw new \RuntimeException('Archive empty.');
         }
 
-        // Sync new code in, preserving runtime state + currently built assets.
+        // Sync new code in, preserving runtime state. public/build is excluded
+        // here (the code tarball has no built assets) and replaced below.
         $excludes = ['.env', 'storage', 'database', 'bootstrap/cache', 'public/build', '.git', 'node_modules', 'vendor'];
         $rsync = ['rsync', '-a', '--delete'];
         foreach ($excludes as $e) {
@@ -725,24 +726,94 @@ class AgentHandlers
             throw new \RuntimeException('Sync failed: '.trim($rs->errorOutput()));
         }
 
-        // Backend dependencies + migrations + cache.
-        self::run(['bash', '-c', "cd {$dest} && COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer install --no-dev --optimize-autoloader 2>&1"], 600);
-        self::run(['php8.4', "{$dest}/artisan", 'migrate', '--force'], 300);
-        self::run(['php8.4', "{$dest}/artisan", 'optimize:clear'], 120);
-        self::run(['chown', '-R', 'www-data:www-data', "{$dest}/bootstrap/cache", "{$dest}/storage", "{$dest}/database"]);
-        self::run(['systemctl', 'reload', 'php8.4-fpm']);
+        // Resolve the toolchain on THIS box (don't hardcode versions/paths).
+        $php = PHP_BINARY ?: 'php';
+        $fpmV = self::systemPhpVersion();
+        $composer = trim(self::run(['bash', '-c', 'command -v composer || ls /usr/local/bin/composer /usr/bin/composer 2>/dev/null | head -1'])->output());
+
+        // Backend: dependencies + migrations.
+        if ($composer !== '') {
+            self::run(['bash', '-c', "cd {$dest} && COMPOSER_ALLOW_SUPERUSER=1 {$php} ".escapeshellarg($composer).' install --no-dev --optimize-autoloader 2>&1'], 600);
+        }
+        self::run([$php, "{$dest}/artisan", 'migrate', '--force'], 300);
+
+        // Frontend: ship built assets so UI changes actually appear. (GitHub code
+        // tarballs don't contain public/build.) Prebuilt release asset first, then
+        // an on-box npm build as a fallback.
+        $frontend = self::deployFrontendAssets($repo, $tag, $token, $dest);
+
+        self::run([$php, "{$dest}/artisan", 'optimize:clear'], 120);
+        self::run(['chown', '-R', 'www-data:www-data', "{$dest}/bootstrap/cache", "{$dest}/storage", "{$dest}/database", "{$dest}/public/build"]);
+        self::run(['systemctl', 'reload', "php{$fpmV}-fpm"]);
         self::run(['rm', '-rf', $tmp]);
 
         if (class_exists(\App\Support\Setting::class)) {
             \App\Support\Setting::set('panel.updated_at', now()->toIso8601String());
             \App\Support\Setting::set('panel.updated_to', $tag);
+            \App\Support\Setting::set('panel.frontend_status', $frontend);
         }
 
         // Restart the agent AFTER this op finishes so we don't kill ourselves
         // mid-handler (the worker has the old code loaded in memory).
         self::run(['bash', '-c', 'nohup sh -c "sleep 3; systemctl restart convorocp-agent" >/dev/null 2>&1 &']);
 
-        return ['applied' => true, 'tag' => $tag];
+        return ['applied' => true, 'tag' => $tag, 'frontend' => $frontend];
+    }
+
+    /**
+     * Deploy the panel's built frontend assets (public/build) for a release.
+     * 1) a prebuilt release asset (dist*.tar.gz / public-build*.tar.gz), else
+     * 2) an on-box `npm ci && npm run build` if Node is present, else
+     * 3) leave the existing assets and report that the UI wasn't updated.
+     */
+    private static function deployFrontendAssets(string $repo, string $tag, ?string $token, string $dest): array
+    {
+        $hdr = ['-H', 'User-Agent: ConvoroCP', '-H', 'Accept: application/vnd.github+json'];
+        if ($token) {
+            $hdr[] = '-H';
+            $hdr[] = 'Authorization: Bearer '.$token;
+        }
+
+        // 1) Prebuilt release asset.
+        $rel = self::run(array_merge(['curl', '-fsSL'], $hdr, ["https://api.github.com/repos/{$repo}/releases/tags/{$tag}"]), 60);
+        if ($rel->successful()) {
+            $assets = json_decode($rel->output(), true)['assets'] ?? [];
+            foreach ($assets as $a) {
+                if (! preg_match('/(dist|public-?build).*\.tar\.gz$/i', (string) ($a['name'] ?? ''))) {
+                    continue;
+                }
+                $tmp = '/tmp/convorocp-dist-'.preg_replace('/[^\w.-]/', '', $tag).'.tar.gz';
+                $dhdr = ['-H', 'User-Agent: ConvoroCP', '-H', 'Accept: application/octet-stream'];
+                if ($token) {
+                    $dhdr[] = '-H';
+                    $dhdr[] = 'Authorization: Bearer '.$token;
+                }
+                $dl = self::run(array_merge(['curl', '-fsSL', '-o', $tmp], $dhdr, [$a['url']]), 300);
+                if ($dl->successful()) {
+                    self::run(['rm', '-rf', "{$dest}/public/build"]);
+                    $ex = self::run(['tar', '-xzf', $tmp, '-C', $dest], 120);
+                    self::run(['rm', '-f', $tmp]);
+                    if ($ex->successful() && is_dir("{$dest}/public/build")) {
+                        return ['ok' => true, 'how' => 'release-asset', 'asset' => $a['name']];
+                    }
+                }
+                break; // matched an asset but it failed — fall through to npm
+            }
+        }
+
+        // 2) Build on the box if npm is available.
+        $npm = trim(self::run(['bash', '-c', 'command -v npm || true'])->output());
+        if ($npm !== '') {
+            self::run(['bash', '-c', "cd {$dest} && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) 2>&1"], 900);
+            $b = self::run(['bash', '-c', "cd {$dest} && npm run build 2>&1"], 600);
+            if ($b->successful() && is_dir("{$dest}/public/build")) {
+                return ['ok' => true, 'how' => 'npm-build'];
+            }
+
+            return ['ok' => false, 'how' => 'npm-build', 'note' => 'npm run build failed: '.trim($b->errorOutput() ?: $b->output())];
+        }
+
+        return ['ok' => false, 'how' => 'none', 'note' => 'No prebuilt asset and npm not on the server — frontend assets were not updated.'];
     }
 
     // ---- OS / kernel updates -------------------------------------------

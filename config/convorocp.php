@@ -8,7 +8,7 @@ return [
      * overridden per-install via CONVOROCP_VERSION (useful to simulate an older
      * install when testing the self-updater).
      */
-    'version' => env('CONVOROCP_VERSION', '1.1.1'),
+    'version' => env('CONVOROCP_VERSION', '1.1.2'),
 
     /*
      * Self-update source. `repo` is owner/name on GitHub; private repos need a
