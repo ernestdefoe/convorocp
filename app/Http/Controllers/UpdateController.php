@@ -47,7 +47,44 @@ class UpdateController extends Controller
             'checkedAt' => Setting::get('update.checked_at'),
             'error' => Setting::get('update.error'),
             'updating' => AgentOperation::where('op', 'panel.update')->whereIn('status', ['pending', 'running'])->exists(),
+            'system' => [
+                'summary' => Setting::get('system.updates'),
+                'checkedAt' => Setting::get('system.updates_checked_at'),
+                'error' => Setting::get('system.updates_error'),
+                'upgradedAt' => Setting::get('system.upgraded_at'),
+                'rebootScheduledAt' => Setting::get('system.reboot_scheduled_at'),
+                'checking' => AgentOperation::where('op', 'system.update_check')->whereIn('status', ['pending', 'running'])->exists(),
+                'upgrading' => AgentOperation::where('op', 'system.upgrade')->whereIn('status', ['pending', 'running'])->exists(),
+                'rebooting' => AgentOperation::where('op', 'system.reboot')->whereIn('status', ['pending', 'running'])->exists(),
+            ],
         ]);
+    }
+
+    public function systemCheck(Request $request)
+    {
+        $this->ensureOperator($request);
+        Agent::dispatch('system.update_check', []);
+
+        return back();
+    }
+
+    public function systemUpgrade(Request $request)
+    {
+        $this->ensureOperator($request);
+        $data = $request->validate([
+            'mode' => ['nullable', 'in:all,security'],
+        ]);
+        Agent::dispatch('system.upgrade', ['mode' => $data['mode'] ?? 'all']);
+
+        return back();
+    }
+
+    public function systemReboot(Request $request)
+    {
+        $this->ensureOperator($request);
+        Agent::dispatch('system.reboot', []);
+
+        return back();
     }
 
     public function check(Request $request)

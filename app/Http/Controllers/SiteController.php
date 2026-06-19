@@ -92,6 +92,8 @@ class SiteController extends Controller
                 'id' => $site->id,
                 'domain' => $site->domain,
                 'runtime' => $site->runtime,
+                'docroot' => $site->docroot,
+                'default_docroot' => $site->defaultDocroot(),
                 'php_version' => $site->php_version,
                 'status' => $site->status,
                 'ssl_status' => $site->ssl_status,
@@ -166,6 +168,38 @@ class SiteController extends Controller
         return back();
     }
 
+    /** Set (or reset, when blank) the per-site nginx document root. */
+    public function setDocroot(Request $request, Site $site)
+    {
+        $this->authorizeSite($request, $site);
+        abort_if($site->adopted, 422, 'This site is adopted (managed externally) — its document root is set outside the panel.');
+        $data = $request->validate([
+            'docroot' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $docroot = trim((string) ($data['docroot'] ?? ''));
+        if ($docroot !== '') {
+            // Mirror the agent-side guard so bad input is rejected before queuing.
+            $valid = (bool) preg_match('#^/[\w./-]+$#', $docroot) && ! str_contains($docroot, '..');
+            $underRoot = collect(Site::DOCROOT_ROOTS)->contains(
+                fn ($p) => $docroot === $p || str_starts_with($docroot, $p.'/')
+            );
+            if (! $valid || ! $underRoot) {
+                return back()->withErrors(['docroot' => 'Document root must be an absolute path under /var/www, /home or /srv, with no "..".']);
+            }
+            $docroot = rtrim($docroot, '/');
+        }
+
+        $site->update(['docroot' => $docroot ?: null]);
+        Agent::dispatch('site.set_docroot', [
+            'domain' => $site->domain,
+            'runtime' => $site->runtime,
+            'docroot' => $site->effectiveDocroot(),
+        ]);
+
+        return back()->with('status', 'Document root update queued — the agent will re-point nginx and reload.');
+    }
+
     public function updateRepo(Request $request, Site $site)
     {
         $this->authorizeSite($request, $site);
@@ -190,7 +224,7 @@ class SiteController extends Controller
             return back()->withErrors(['repo' => 'Set a git repository first.']);
         }
         $site->update(['status' => 'deploying']);
-        Agent::dispatch('site.deploy', ['domain' => $site->domain, 'repo' => $site->repo, 'branch' => $site->branch]);
+        Agent::dispatch('site.deploy', ['domain' => $site->domain, 'repo' => $site->repo, 'branch' => $site->branch, 'docroot' => $site->effectiveDocroot()]);
 
         return back();
     }
@@ -199,7 +233,7 @@ class SiteController extends Controller
     {
         abort_unless($site->deploy_token && hash_equals($site->deploy_token, $token), 404);
         if ($site->auto_deploy && $site->repo) {
-            Agent::dispatch('site.deploy', ['domain' => $site->domain, 'repo' => $site->repo, 'branch' => $site->branch]);
+            Agent::dispatch('site.deploy', ['domain' => $site->domain, 'repo' => $site->repo, 'branch' => $site->branch, 'docroot' => $site->effectiveDocroot()]);
 
             return response()->json(['ok' => true, 'queued' => true]);
         }

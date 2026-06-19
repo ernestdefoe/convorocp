@@ -17,7 +17,7 @@ class Agent
     /** Operations the agent will accept. Anything else is rejected here. */
     public const ALLOWED = [
         'site.create', 'site.adopt', 'site.detach', 'site.delete', 'site.set_php_version', 'site.set_php_settings',
-        'site.deploy', 'vhost.render',
+        'site.set_docroot', 'site.deploy', 'vhost.render',
         'php.fpm.pool.write', 'php.fpm.reload', 'php.install', 'php.uninstall',
         'cert.issue', 'cert.renew',
         'db.create', 'db.drop', 'db.user.create', 'db.user.grant',
@@ -33,6 +33,7 @@ class Agent
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
         'fail2ban.install', 'fail2ban.unban', 'fail2ban.ban',
         'panel.update',
+        'system.update_check', 'system.upgrade', 'system.reboot',
         'app.install',
     ];
 

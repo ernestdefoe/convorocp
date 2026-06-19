@@ -31,6 +31,9 @@ function toggleFn(fn) {
     if (i === -1) ini.disable_functions.push(fn); else ini.disable_functions.splice(i, 1);
 }
 
+const docrootForm = useForm({ docroot: props.site.docroot || '' });
+function saveDocroot() { docrootForm.patch(`/sites/${props.site.id}/docroot`, { preserveScroll: true }); }
+
 const repo = useForm({ repo: props.site.repo || '', branch: props.site.branch || 'main', auto_deploy: !!props.site.auto_deploy });
 function saveRepo() { repo.patch(`/sites/${props.site.id}/repo`, { preserveScroll: true }); }
 function deployNow() { router.post(`/sites/${props.site.id}/deploy`, {}, { preserveScroll: true }); }
@@ -79,6 +82,28 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 9px"><span style="color: var(--cp-mut)">Status</span><span style="text-transform: capitalize">{{ site.status }}</span></div>
                 <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--cp-mut)">Auto-deploy</span><span>{{ site.auto_deploy ? 'On' : 'Off' }}</span></div>
+            </div>
+        </div>
+
+        <div style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 14px 16px; margin-bottom: 14px">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px">
+                <i class="ti ti-folder-root" style="color: var(--cp-vio); font-size: 17px" aria-hidden="true"></i>
+                <span style="font-size: 13px; font-weight: 600; flex: 1">Document root</span>
+                <button v-if="!site.adopted" type="button" @click="saveDocroot" :disabled="docrootForm.processing"
+                    style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 6px 14px; font-weight: 500; cursor: pointer; font-family: inherit">{{ docrootForm.processing ? 'Saving…' : 'Save & reload' }}</button>
+            </div>
+            <template v-if="!site.adopted">
+                <input v-model="docrootForm.docroot" spellcheck="false" :placeholder="site.default_docroot"
+                    :style="field + ';width:100%;font-family:ui-monospace,monospace;font-size:12.5px'" />
+                <p v-if="docrootForm.errors.docroot" style="color: var(--cp-red); font-size: 12px; margin: 8px 0 0">{{ docrootForm.errors.docroot }}</p>
+                <p style="font-size: 11px; color: var(--cp-dim); margin: 9px 0 0">
+                    The folder nginx serves for this site. Leave blank to use the default
+                    <code style="font-family: ui-monospace, monospace; color: var(--cp-mut)">{{ site.default_docroot }}</code>.
+                    Must be under <code style="font-family: ui-monospace, monospace; color: var(--cp-mut)">/var/www</code>, <code style="font-family: ui-monospace, monospace; color: var(--cp-mut)">/home</code> or <code style="font-family: ui-monospace, monospace; color: var(--cp-mut)">/srv</code>.
+                </p>
+            </template>
+            <div v-else style="font-size: 12px; color: var(--cp-dim)">
+                This site is adopted (managed externally) — its document root is configured outside the panel.
             </div>
         </div>
 

@@ -4,9 +4,11 @@ return [
     /*
      * The installed ConvoroCP version. Compared against the latest GitHub
      * release/tag on the Updates page; the panel.update agent op pulls and
-     * applies a newer tag. Bump this on every release tag.
+     * applies a newer tag. Bump this default on every release tag. It can be
+     * overridden per-install via CONVOROCP_VERSION (useful to simulate an older
+     * install when testing the self-updater).
      */
-    'version' => '1.0.0',
+    'version' => env('CONVOROCP_VERSION', '1.1.0'),
 
     /*
      * Self-update source. `repo` is owner/name on GitHub; private repos need a

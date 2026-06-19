@@ -8,9 +8,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Site extends Model
 {
     protected $fillable = [
-        'user_id', 'domain', 'runtime', 'php_version', 'php_settings', 'status',
+        'user_id', 'domain', 'runtime', 'docroot', 'php_version', 'php_settings', 'status',
         'ssl_status', 'repo', 'branch', 'auto_deploy', 'deploy_token', 'adopted',
     ];
+
+    /** Document roots may live under these prefixes (also enforced agent-side). */
+    public const DOCROOT_ROOTS = ['/var/www', '/home', '/srv'];
+
+    /** The convention when no custom document root is set. */
+    public function defaultDocroot(): string
+    {
+        return "/var/www/sites/{$this->domain}/public";
+    }
+
+    /** The path nginx actually serves for this site. */
+    public function effectiveDocroot(): string
+    {
+        return $this->docroot ?: $this->defaultDocroot();
+    }
 
     /** The auto-deploy webhook token, generated on first access. */
     public function deployToken(): string

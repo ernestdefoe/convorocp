@@ -21,6 +21,7 @@ class AgentHandlers
         'site.detach' => 'siteDetach',
         'site.set_php_version' => 'siteSetPhpVersion',
         'site.set_php_settings' => 'siteSetPhpSettings',
+        'site.set_docroot' => 'siteSetDocroot',
         'site.deploy' => 'siteDeploy',
         'site.delete' => 'siteDelete',
         'cert.issue' => 'certIssue',
@@ -38,6 +39,9 @@ class AgentHandlers
         'mail.account_create' => 'mailAccountCreate',
         'mail.account_delete' => 'mailAccountDelete',
         'panel.update' => 'panelUpdate',
+        'system.update_check' => 'systemUpdateCheck',
+        'system.upgrade' => 'systemUpgrade',
+        'system.reboot' => 'systemReboot',
         'app.install' => 'appInstall',
         'service.control' => 'serviceControl',
         'firewall.allow' => 'firewallRule',
@@ -109,7 +113,10 @@ class AgentHandlers
         $php = in_array(($args['php'] ?? ''), self::installedVersions(), true) ? $args['php'] : self::installedVersions()[0];
 
         $base = "/var/www/sites/{$domain}";
-        $root = "{$base}/public";
+        $root = self::safeDocroot($args['docroot'] ?? null, $domain);
+        if (! is_dir($base)) {
+            mkdir($base, 0755, true);
+        }
         if (! is_dir($root)) {
             mkdir($root, 0755, true);
         }
@@ -120,6 +127,10 @@ class AgentHandlers
             file_put_contents("{$root}/index.html", "<!doctype html><meta charset=utf-8><h1>{$domain} is live</h1><p>Served by ConvoroCP.</p>\n");
         }
         self::run(['chown', '-R', 'www-data:www-data', $base]);
+        // A custom root may live outside the site base — own it too.
+        if (! str_starts_with($root, $base.'/') && $root !== $base) {
+            self::run(['chown', '-R', 'www-data:www-data', $root]);
+        }
 
         $sock = null;
         if ($runtime === 'php') {
@@ -182,6 +193,36 @@ class AgentHandlers
         return ['applied' => true, 'domain' => $domain, 'php' => $php];
     }
 
+    /** Point the site's nginx vhost at a new document root, test + reload. */
+    private static function siteSetDocroot(array $args): array
+    {
+        $domain = self::domain($args);
+        $runtime = in_array(($args['runtime'] ?? 'php'), ['php', 'static', 'node'], true) ? $args['runtime'] : 'php';
+        $root = self::safeDocroot($args['docroot'] ?? null, $domain);
+        $sock = $runtime === 'php' ? "/run/php/cp-{$domain}.sock" : null;
+
+        if (! is_dir($root)) {
+            mkdir($root, 0755, true);
+            self::run(['chown', '-R', 'www-data:www-data', $root]);
+        }
+
+        $vhost = "/etc/nginx/sites-available/{$domain}";
+        if (! is_file($vhost)) {
+            throw new \RuntimeException("No vhost for {$domain} to update.");
+        }
+        $prev = (string) file_get_contents($vhost);
+        file_put_contents($vhost, self::nginxConf($domain, $root, $runtime, $sock));
+
+        $test = self::run(['nginx', '-t']);
+        if (! $test->successful()) {
+            file_put_contents($vhost, $prev);   // revert to the working config
+            throw new \RuntimeException('nginx config invalid, reverted: '.trim($test->errorOutput()));
+        }
+        self::run(['systemctl', 'reload', 'nginx']);
+
+        return ['applied' => true, 'domain' => $domain, 'root' => $root];
+    }
+
     private static function siteDeploy(array $args): array
     {
         $domain = self::domain($args);
@@ -190,7 +231,7 @@ class AgentHandlers
             throw new \RuntimeException('Only https:// git repositories are supported.');
         }
         $branch = preg_match('/^[a-z0-9._\-\/]+$/i', (string) ($args['branch'] ?? 'main')) ? $args['branch'] : 'main';
-        $root = "/var/www/sites/{$domain}/public";
+        $root = self::safeDocroot($args['docroot'] ?? null, $domain);
 
         if (is_dir("{$root}/.git")) {
             self::run(['git', '-C', $root, 'remote', 'set-url', 'origin', $repo]);
@@ -210,6 +251,9 @@ class AgentHandlers
         }
 
         self::run(['chown', '-R', 'www-data:www-data', "/var/www/sites/{$domain}"]);
+        if (! str_starts_with($root, "/var/www/sites/{$domain}/")) {
+            self::run(['chown', '-R', 'www-data:www-data', $root]);
+        }
 
         return ['applied' => true, 'domain' => $domain, 'repo' => $repo, 'branch' => $branch];
     }
@@ -686,6 +730,102 @@ class AgentHandlers
         self::run(['bash', '-c', 'nohup sh -c "sleep 3; systemctl restart convorocp-agent" >/dev/null 2>&1 &']);
 
         return ['applied' => true, 'tag' => $tag];
+    }
+
+    // ---- OS / kernel updates -------------------------------------------
+
+    /**
+     * Refresh the apt index and record what's upgradable (incl. security
+     * updates and whether a reboot — i.e. a new kernel — is pending). Writes the
+     * summary to settings so the Updates page can render it.
+     */
+    private static function systemUpdateCheck(array $args): array
+    {
+        $env = ['DEBIAN_FRONTEND' => 'noninteractive'];
+        self::run(['apt-get', 'update', '-qq'], 300, $env);
+
+        $list = self::run(['apt-get', '--just-print', 'dist-upgrade'], 120, $env);
+        $packages = [];
+        $security = 0;
+        foreach (explode("\n", $list->output()) as $line) {
+            if (preg_match('/^Inst\s+(\S+)\s+\[([^\]]*)\]\s+\(([^\s]+)/', $line, $m)) {
+                $isSec = (bool) preg_match('/security/i', $line);
+                $packages[] = ['name' => $m[1], 'from' => $m[2], 'to' => $m[3], 'security' => $isSec];
+                $security += $isSec ? 1 : 0;
+            }
+        }
+
+        $rebootRequired = is_file('/var/run/reboot-required');
+        $rebootPkgs = is_file('/var/run/reboot-required.pkgs')
+            ? array_values(array_filter(array_map('trim', file('/var/run/reboot-required.pkgs') ?: [])))
+            : [];
+
+        $summary = [
+            'count' => count($packages),
+            'security' => $security,
+            'reboot_required' => $rebootRequired,
+            'reboot_pkgs' => $rebootPkgs,
+            'kernel' => php_uname('r'),
+            // Cap the stored list so a huge backlog can't bloat the settings row.
+            'packages' => array_slice($packages, 0, 200),
+        ];
+
+        if (class_exists(\App\Support\Setting::class)) {
+            \App\Support\Setting::set('system.updates', $summary);
+            \App\Support\Setting::set('system.updates_checked_at', now()->toIso8601String());
+            \App\Support\Setting::set('system.updates_error', null);
+        }
+
+        return ['applied' => true] + $summary;
+    }
+
+    /**
+     * Apply OS package updates. mode=security upgrades only; mode=all does a full
+     * dist-upgrade (which pulls in new kernels). Re-checks afterwards.
+     */
+    private static function systemUpgrade(array $args): array
+    {
+        $mode = ($args['mode'] ?? 'all') === 'security' ? 'security' : 'all';
+        $env = ['DEBIAN_FRONTEND' => 'noninteractive'];
+        $opts = ['-y', '-o', 'Dpkg::Options::=--force-confdef', '-o', 'Dpkg::Options::=--force-confold'];
+
+        self::run(['apt-get', 'update', '-qq'], 300, $env);
+        // dist-upgrade applies held-back/kernel updates too; for security-only we
+        // lean on unattended-upgrades which is pre-scoped to the security pocket.
+        $cmd = $mode === 'security'
+            ? ['unattended-upgrade', '-v']
+            : array_merge(['apt-get', 'dist-upgrade'], $opts);
+        $r = self::run($cmd, 1800, $env);
+        if (! $r->successful()) {
+            $msg = trim($r->errorOutput()) ?: trim($r->output());
+            if (class_exists(\App\Support\Setting::class)) {
+                \App\Support\Setting::set('system.updates_error', 'Upgrade failed: '.$msg);
+            }
+            throw new \RuntimeException('apt upgrade failed: '.$msg);
+        }
+        self::run(['apt-get', 'autoremove', '-y'], 300, $env);
+
+        if (class_exists(\App\Support\Setting::class)) {
+            \App\Support\Setting::set('system.upgraded_at', now()->toIso8601String());
+        }
+
+        // Refresh the upgradable summary so the UI reflects the new state.
+        self::systemUpdateCheck([]);
+
+        return ['applied' => true, 'mode' => $mode];
+    }
+
+    /** Reboot the node (e.g. to finish a kernel update), deferred so the op can return. */
+    private static function systemReboot(array $args): array
+    {
+        // +1 minute gives the agent time to mark this op done and flush the queue.
+        self::run(['shutdown', '-r', '+1', 'ConvoroCP: applying system updates']);
+
+        if (class_exists(\App\Support\Setting::class)) {
+            \App\Support\Setting::set('system.reboot_scheduled_at', now()->toIso8601String());
+        }
+
+        return ['applied' => true, 'when' => '+1 minute'];
     }
 
     // ---- One-click apps -------------------------------------------------
@@ -1359,6 +1499,30 @@ class AgentHandlers
         return $domain;
     }
 
+    /**
+     * Resolve a per-site document root, validating any custom path. Empty/invalid
+     * falls back to the convention /var/www/sites/{domain}/public. Custom roots
+     * must be absolute, free of traversal, and under an allowed prefix.
+     */
+    private static function safeDocroot(?string $docroot, string $domain): string
+    {
+        $default = "/var/www/sites/{$domain}/public";
+        $docroot = trim((string) $docroot);
+        if ($docroot === '') {
+            return $default;
+        }
+        if (! str_starts_with($docroot, '/') || str_contains($docroot, '..') || ! preg_match('#^/[\w./-]+$#', $docroot)) {
+            throw new \RuntimeException('Invalid document root.');
+        }
+        $docroot = rtrim($docroot, '/');
+        foreach (['/var/www', '/home', '/srv'] as $prefix) {
+            if ($docroot === $prefix || str_starts_with($docroot, $prefix.'/')) {
+                return $docroot;
+            }
+        }
+        throw new \RuntimeException('Document root must be under /var/www, /home or /srv.');
+    }
+
     private static function fpmPool(string $domain, string $sock, array $settings = []): string
     {
         $s = array_merge([
@@ -1422,6 +1586,7 @@ class AgentHandlers
             $op === 'site.delete' => "remove vhost + pool + webroot for {$d}",
             $op === 'site.set_php_version' => "point {$d} FPM pool at PHP ".($args['php'] ?? '?'),
             $op === 'site.set_php_settings' => "apply PHP/INI settings to {$d}",
+            $op === 'site.set_docroot' => "point {$d}'s document root at ".($args['docroot'] ?? '?').", reload nginx",
             $op === 'site.deploy' => "git deploy {$d} from ".($args['repo'] ?? 'repo'),
             str_starts_with($op, 'cert.') => 'ACME '.substr($op, 5)." certificate for {$d}",
             str_starts_with($op, 'db.') => "{$op} on the ".($args['engine'] ?? '?')." engine ({$d})",
@@ -1434,6 +1599,9 @@ class AgentHandlers
             $op === 'mail.account_create' => "create mailbox ".($args['email'] ?? ''),
             $op === 'mail.account_delete' => "delete mailbox ".($args['email'] ?? ''),
             $op === 'panel.update' => "update ConvoroCP to ".($args['tag'] ?? ''),
+            $op === 'system.update_check' => 'apt-get update + list upgradable OS packages',
+            $op === 'system.upgrade' => ($args['mode'] ?? 'all') === 'security' ? 'install OS security updates' : 'apt-get dist-upgrade (incl. kernel)',
+            $op === 'system.reboot' => 'reboot the server (+1 min)',
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
             str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
             $op === 'fail2ban.install' => 'install + configure fail2ban',

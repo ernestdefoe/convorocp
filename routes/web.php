@@ -101,6 +101,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
     Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');
+    Route::patch('/sites/{site}/docroot', [SiteController::class, 'setDocroot'])->name('sites.docroot');
     Route::patch('/sites/{site}/repo', [SiteController::class, 'updateRepo'])->name('sites.repo');
     Route::post('/sites/{site}/nginx', [SiteController::class, 'saveNginx'])->name('sites.nginx');
     Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->name('sites.deploy');
@@ -166,6 +167,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/updates/check', [UpdateController::class, 'check'])->name('updates.check');
     Route::post('/updates/settings', [UpdateController::class, 'saveSettings'])->name('updates.settings');
     Route::post('/updates/apply', [UpdateController::class, 'apply'])->name('updates.apply');
+    Route::post('/updates/system/check', [UpdateController::class, 'systemCheck'])->name('updates.system.check');
+    Route::post('/updates/system/upgrade', [UpdateController::class, 'systemUpgrade'])->name('updates.system.upgrade');
+    Route::post('/updates/system/reboot', [UpdateController::class, 'systemReboot'])->name('updates.system.reboot');
 
     Route::get('/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('/security/rules', [SecurityController::class, 'addRule'])->name('security.rules.add');
