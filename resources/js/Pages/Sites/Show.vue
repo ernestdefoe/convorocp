@@ -154,15 +154,19 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px">
                 <i class="ti ti-server-2" style="color: var(--cp-vio); font-size: 17px" aria-hidden="true"></i>
                 <span style="font-size: 13px; font-weight: 600; flex: 1">nginx vhost</span>
-                <button type="button" @click="saveNginx" :disabled="nginxForm.processing || nginx.conf === null"
+                <span v-if="site.adopted" style="font-size: 11px; color: var(--cp-amb); display: inline-flex; align-items: center; gap: 4px"><i class="ti ti-lock" style="font-size: 13px" aria-hidden="true"></i>Read-only</span>
+                <button v-else type="button" @click="saveNginx" :disabled="nginxForm.processing || nginx.conf === null"
                     style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 6px 14px; font-weight: 500; cursor: pointer; font-family: inherit">{{ nginxForm.processing ? 'Saving…' : 'Save & reload' }}</button>
             </div>
             <div style="font-size: 11px; color: var(--cp-dim); font-family: ui-monospace, monospace; margin-bottom: 8px">{{ nginx.path }}</div>
-            <textarea v-if="nginx.conf !== null" v-model="nginxForm.content" spellcheck="false" rows="14"
-                style="box-sizing: border-box; width: 100%; background: var(--cp-card2); border: 1px solid var(--cp-ln); border-radius: 9px; color: var(--cp-ink); padding: 11px 12px; font-size: 12px; font-family: ui-monospace, monospace; line-height: 1.5; resize: vertical"></textarea>
+            <textarea v-if="nginx.conf !== null" v-model="nginxForm.content" spellcheck="false" rows="14" :readonly="site.adopted"
+                :style="`box-sizing:border-box;width:100%;background:var(--cp-card2);border:1px solid var(--cp-ln);border-radius:9px;color:var(--cp-ink);padding:11px 12px;font-size:12px;font-family:ui-monospace,monospace;line-height:1.5;resize:vertical${site.adopted ? ';opacity:.7;cursor:not-allowed' : ''}`"></textarea>
             <div v-else style="font-size: 12px; color: var(--cp-dim)">No vhost file found at this path yet.</div>
             <p v-if="nginxForm.errors.content" style="color: var(--cp-red); font-size: 12px; margin: 8px 0 0">{{ nginxForm.errors.content }}</p>
-            <p style="font-size: 11px; color: var(--cp-dim); margin: 9px 0 0; display: flex; align-items: center; gap: 6px">
+            <p v-if="site.adopted" style="font-size: 11px; color: var(--cp-amb); margin: 9px 0 0; display: flex; align-items: center; gap: 6px">
+                <i class="ti ti-shield-lock" style="font-size: 14px" aria-hidden="true"></i>This site is adopted — its vhost is managed outside the panel and shown for reference only. Edit it on the server.
+            </p>
+            <p v-else style="font-size: 11px; color: var(--cp-dim); margin: 9px 0 0; display: flex; align-items: center; gap: 6px">
                 <i class="ti ti-shield-check" style="font-size: 14px" aria-hidden="true"></i>The agent runs <code style="font-family: ui-monospace, monospace">nginx -t</code> before reloading and auto-reverts if the config is invalid.
             </p>
         </div>

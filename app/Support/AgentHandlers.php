@@ -187,7 +187,20 @@ class AgentHandlers
         $php = in_array(($args['php'] ?? ''), self::installedVersions(), true) ? $args['php'] : self::installedVersions()[0];
         $sock = "/run/php/cp-{$domain}.sock";
 
-        file_put_contents("/etc/php/{$php}/fpm/pool.d/{$domain}.conf", self::fpmPool($domain, $sock, $args['settings'] ?? []));
+        $pool = "/etc/php/{$php}/fpm/pool.d/{$domain}.conf";
+        $backup = $pool.'.cpbak';
+        if (is_file($pool)) {
+            copy($pool, $backup);
+        }
+        file_put_contents($pool, self::fpmPool($domain, $sock, $args['settings'] ?? []));
+
+        // Test before reloading — this version's master also serves other sites
+        // (and on a co-located box, a live forum). A bad pool must not reach it.
+        if (! self::fpmConfigOk($php)) {
+            is_file($backup) ? copy($backup, $pool) : @unlink($pool);
+
+            throw new \RuntimeException("php{$php} pool config invalid for {$domain} — reverted, FPM not reloaded.");
+        }
         self::run(['systemctl', 'reload', "php{$php}-fpm"]);
 
         return ['applied' => true, 'domain' => $domain, 'php' => $php];
@@ -1463,6 +1476,11 @@ class AgentHandlers
         if (! in_array($v, self::installedVersions(), true)) {
             throw new \RuntimeException('Unknown PHP version.');
         }
+        // Backstop for the controller's confirm gate: never rewrite the system
+        // PHP's php.ini (shared with the panel + any live site) without confirm.
+        if ($v === self::systemPhpVersion() && empty($args['confirm'])) {
+            throw new \RuntimeException("Refusing to edit the system php.ini (PHP {$v}) without confirmation — it is shared with the panel and live sites.");
+        }
         $content = (string) ($args['content'] ?? '');
         if (trim($content) === '') {
             throw new \RuntimeException('Refusing to write an empty php.ini.');
@@ -1473,6 +1491,16 @@ class AgentHandlers
             copy($path, $backup);
         }
         file_put_contents($path, $content);
+
+        // Validate the FULL fpm config (php.ini + pools) BEFORE reloading, so a
+        // broken ini never reaches the running master shared by every pool.
+        if (! self::fpmConfigOk($v)) {
+            if (is_file($backup)) {
+                copy($backup, $path);
+            }
+
+            throw new \RuntimeException("php{$v} config test failed — reverted, FPM not reloaded.");
+        }
 
         $r = self::run(['systemctl', 'reload', "php{$v}-fpm"]);
         if (! $r->successful()) {
@@ -1485,6 +1513,27 @@ class AgentHandlers
         }
 
         return ['applied' => true, 'path' => $path];
+    }
+
+    /** The PHP version the agent itself runs on — its php.ini is the system one. */
+    private static function systemPhpVersion(): string
+    {
+        return implode('.', array_slice(explode('.', PHP_VERSION), 0, 2));
+    }
+
+    /**
+     * `php-fpm{v} -t` validates php.ini + every pool for that version. Returns
+     * true if the config is valid OR the binary can't be found here (so a box
+     * that lacks it isn't blocked — we fall back to the reload result).
+     */
+    private static function fpmConfigOk(string $v): bool
+    {
+        $bin = "/usr/sbin/php-fpm{$v}";
+        if (! is_file($bin)) {
+            return true;
+        }
+
+        return self::run([$bin, '-t'])->successful();
     }
 
     // ---- Templates / helpers --------------------------------------------

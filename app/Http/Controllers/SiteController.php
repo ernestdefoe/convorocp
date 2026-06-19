@@ -114,6 +114,10 @@ class SiteController extends Controller
     public function saveNginx(Request $request, Site $site)
     {
         abort_unless($request->user()->isOperator(), 403);
+        // Adopted sites are served by an externally-managed vhost the panel did
+        // not write (e.g. a live forum with custom proxy/SSL/mail config). Never
+        // let the panel overwrite it.
+        abort_if($site->adopted, 422, 'This site is adopted (managed externally) — its nginx vhost is read-only in the panel.');
         $data = $request->validate([
             'content' => ['required', 'string', 'max:100000'],
         ]);
