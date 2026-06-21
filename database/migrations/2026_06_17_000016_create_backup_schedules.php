@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('target');            // a domain/db name, or '*' for all of that kind
             $table->string('engine')->nullable();
             $table->string('frequency')->default('daily'); // daily | weekly
-            $table->unsignedInteger('retention')->default(7);
+            $table->unsignedInteger('retention')->default(3);
             $table->boolean('enabled')->default(true);
             $table->timestamp('last_run_at')->nullable();
             $table->timestamps();

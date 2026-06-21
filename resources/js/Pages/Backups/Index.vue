@@ -20,7 +20,7 @@ const human = (n) => (n == null ? '—' : n < 1024 ? n + ' B' : n < 1048576 ? (n
 
 // schedules
 const showSched = ref(false);
-const sched = useForm({ kind: 'site', target: '*', frequency: 'daily', retention: 7 });
+const sched = useForm({ kind: 'site', target: '*', frequency: 'daily', retention: 3 });
 const schedTargets = computed(() => sched.kind === 'site' ? props.sites : props.databases.map((d) => d.name));
 const createSched = () => sched.post('/backups/schedules', { preserveScroll: true, onSuccess: () => { showSched.value = false; sched.reset(); } });
 const toggleSched = (s) => router.patch(`/backups/schedules/${s.id}/toggle`, {}, { preserveScroll: true });
