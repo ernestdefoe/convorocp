@@ -36,7 +36,7 @@ const sysUpgrade = (mode) => {
         sysUpgradeForm.transform(() => ({ mode })).post('/updates/system/upgrade', { preserveScroll: true });
     }
 };
-const sysReboot = () => { if (confirm('Reboot the server now? It will go down for ~1 minute to finish applying a kernel update.')) sysRebootForm.post('/updates/system/reboot', { preserveScroll: true }); };
+const sysReboot = () => { if (confirm('Reboot the server now? Every hosted site will be offline for ~1 minute while it restarts.')) sysRebootForm.post('/updates/system/reboot', { preserveScroll: true }); };
 
 // Poll while any panel/system operation is in flight so the page reflects results.
 let poll = null;
@@ -89,6 +89,7 @@ onBeforeUnmount(() => poll && clearInterval(poll));
         <div style="margin-top: 26px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px">
             <i class="ti ti-server-cog" style="font-size: 18px; color: var(--cp-vio)" aria-hidden="true"></i>
             <h2 style="font-size: 14px; font-weight: 600; margin: 0; flex: 1">Server updates</h2>
+            <button type="button" @click="sysReboot" :disabled="sysRebootForm.processing || sys.rebooting" title="Restart the whole server" style="font-size: 12px; color: var(--cp-red); background: var(--cp-card); border: 1px solid var(--cp-red); border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: inherit"><i class="ti ti-rotate-clockwise-2" style="font-size: 14px" aria-hidden="true"></i>{{ sys.rebooting ? 'Rebooting…' : 'Reboot server' }}</button>
             <button type="button" @click="sysCheck" :disabled="sysCheckForm.processing || sys.checking" style="font-size: 12px; color: var(--cp-mut); background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: inherit"><i class="ti ti-refresh" style="font-size: 14px" aria-hidden="true"></i>{{ sys.checking ? 'Checking…' : 'Check now' }}</button>
         </div>
 
