@@ -19,6 +19,19 @@ NOTES="${2:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Keep config/convorocp.php's version default in lockstep with the release tag.
+# The Updates page reads config('convorocp.version') to detect new releases, so
+# if this drifts the panel reports the wrong installed version (and the self-
+# updater can't tell it's up to date). Bump + commit it so the tag includes it.
+CLEAN="${TAG#v}"
+echo "==> Setting installed-version default to ${CLEAN}"
+sed -i -E "s/(env\('CONVOROCP_VERSION', ')[^']*(')/\1${CLEAN}\2/" config/convorocp.php
+if ! git diff --quiet config/convorocp.php; then
+  git add config/convorocp.php
+  git commit -m "chore: set version default to ${CLEAN} for ${TAG}"
+  git push origin HEAD
+fi
+
 echo "==> Building frontend assets"
 npm ci --no-audit --no-fund
 npm run build
