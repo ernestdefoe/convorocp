@@ -608,7 +608,9 @@ class AgentHandlers
         [, $domain] = explode('@', $email, 2);
 
         self::ensureMailDomain($domain);
+        self::ensureMailDir($email);
         self::writeDovecotUser($email, $password);
+        self::writePostfixVmailbox($email);
         self::run(['systemctl', 'reload', 'dovecot']);
 
         if ($id && class_exists(\App\Models\MailAccount::class)) {
@@ -627,10 +629,13 @@ class AgentHandlers
         [$local, $domain] = explode('@', $email, 2);
 
         self::removeDovecotUser($email);
+        self::removePostfixVmailbox($email);
         self::run(['systemctl', 'reload', 'dovecot']);
 
+        // The maildir lives under /var/mail/vhosts (virtual_mailbox_base), not
+        // /var/vmail — the old path here never actually removed anything.
         if (preg_match('/^[a-z0-9._%+-]+$/', $local) && preg_match('/^[a-z0-9.-]+$/', $domain) && ! str_contains($domain, '..')) {
-            self::run(['rm', '-rf', "/var/vmail/{$domain}/{$local}"]);
+            self::run(['rm', '-rf', "/var/mail/vhosts/{$domain}/{$local}"]);
         }
 
         return ['applied' => true, 'email' => $email];
@@ -649,13 +654,76 @@ class AgentHandlers
 
     private static function writeDovecotUser(string $email, string $password): void
     {
+        [$local, $domain] = explode('@', $email, 2);
+        $home = '/var/mail/vhosts/'.$domain.'/'.$local;
+
+        // The userdb passwd-file format is user:password:uid:gid:gecos:home:shell:extra.
+        // The uid/gid (vmail = 5000) and home are REQUIRED — without them Dovecot
+        // can't resolve the mailbox and IMAP login fails with an internal error
+        // (the previous "email:{PLAIN}password" form left logins broken). The
+        // password is hashed to match the SHA512-CRYPT scheme used elsewhere.
+        $hash = trim(self::run(['doveadm', 'pw', '-s', 'SHA512-CRYPT', '-p', $password])->output());
+        if (! str_starts_with($hash, '{SHA512-CRYPT}')) {
+            throw new \RuntimeException('Failed to hash mailbox password.');
+        }
+        $entry = $email.':'.$hash.':5000:5000::'.$home.'::';
+
         $file = '/etc/dovecot/users';
         $lines = is_file($file) ? (file($file, FILE_IGNORE_NEW_LINES) ?: []) : [];
         $lines = array_filter($lines, fn ($l) => $l !== '' && ! str_starts_with($l, $email.':'));
-        $lines[] = $email.':{PLAIN}'.$password;
+        $lines[] = $entry;
         file_put_contents($file, implode("\n", $lines)."\n");
         self::run(['chown', 'root:dovecot', $file]);
         self::run(['chmod', '640', $file]);
+    }
+
+    /**
+     * Register the address in Postfix's virtual mailbox map so the MX accepts
+     * mail for it (then virtual_transport = lmtp hands delivery to Dovecot,
+     * which writes to the Maildir). The path mirrors the working accounts:
+     * "<domain>/<local>/" relative to virtual_mailbox_base.
+     */
+    private static function writePostfixVmailbox(string $email): void
+    {
+        [$local, $domain] = explode('@', $email, 2);
+        $file = '/etc/postfix/vmailbox';
+        $lines = is_file($file) ? (file($file, FILE_IGNORE_NEW_LINES) ?: []) : [];
+        $lines = array_filter($lines, fn ($l) => $l !== '' && ! preg_match('/^'.preg_quote($email, '/').'\s/i', $l));
+        $lines[] = $email."\t".$domain.'/'.$local.'/';
+        file_put_contents($file, implode("\n", $lines)."\n");
+        self::run(['postmap', $file]);
+        self::run(['systemctl', 'reload', 'postfix']);
+    }
+
+    private static function removePostfixVmailbox(string $email): void
+    {
+        $file = '/etc/postfix/vmailbox';
+        if (! is_file($file)) {
+            return;
+        }
+        $lines = array_filter(file($file, FILE_IGNORE_NEW_LINES) ?: [], fn ($l) => $l !== '' && ! preg_match('/^'.preg_quote($email, '/').'\s/i', $l));
+        file_put_contents($file, $lines ? implode("\n", $lines)."\n" : '');
+        self::run(['postmap', $file]);
+        self::run(['systemctl', 'reload', 'postfix']);
+    }
+
+    /**
+     * Pre-create the Maildir (cur/new/tmp under <home>/Maildir, matching
+     * mail_path) owned by vmail, so the first IMAP login / LMTP delivery has a
+     * valid mailbox to use.
+     */
+    private static function ensureMailDir(string $email): void
+    {
+        [$local, $domain] = explode('@', $email, 2);
+        if (! preg_match('/^[a-z0-9._%+-]+$/', $local) || ! preg_match('/^[a-z0-9.-]+$/', $domain) || str_contains($domain, '..')) {
+            throw new \RuntimeException('Invalid mailbox path.');
+        }
+        $home = '/var/mail/vhosts/'.$domain.'/'.$local;
+        foreach (['cur', 'new', 'tmp'] as $d) {
+            self::run(['mkdir', '-p', $home.'/Maildir/'.$d]);
+        }
+        self::run(['chown', 'vmail:vmail', '/var/mail/vhosts/'.$domain]);
+        self::run(['chown', '-R', 'vmail:vmail', $home]);
     }
 
     private static function removeDovecotUser(string $email): void
