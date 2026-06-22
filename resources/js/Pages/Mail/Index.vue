@@ -5,7 +5,7 @@ import AppLayout from '../../Layouts/AppLayout.vue';
 
 const props = defineProps({
     accounts: Array, selected: Number, folder: String, folders: Array,
-    messages: Array, open: Object, error: String,
+    messages: Array, open: Object, error: String, canRead: Boolean,
 });
 
 const composeOpen = ref(false);
@@ -36,7 +36,7 @@ const folderIcon = { INBOX: 'ti-inbox', Sent: 'ti-send', Drafts: 'ti-file', Tras
     <AppLayout active="mail" title="Webmail" subtitle="Mailboxes on this server">
         <template #actions>
             <button type="button" @click="newboxOpen = true" style="font-size: 12px; color: var(--cp-mut); background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: inherit; margin-right: 8px"><i class="ti ti-plus" style="font-size: 14px" aria-hidden="true"></i>New mailbox</button>
-            <button type="button" :disabled="!selected" @click="composeOpen = true" style="font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; cursor: pointer; font-family: inherit; opacity: 1"><i class="ti ti-pencil" style="font-size: 14px" aria-hidden="true"></i>Compose</button>
+            <button type="button" :disabled="!selected || !canRead" @click="composeOpen = true" :style="`font-size: 12px; color: #fff; background: var(--cp-ind); border: 0; border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; font-family: inherit; ${(!selected || !canRead) ? 'opacity:.45;cursor:default' : 'cursor:pointer'}`"><i class="ti ti-pencil" style="font-size: 14px" aria-hidden="true"></i>Compose</button>
         </template>
 
         <div v-if="!accounts.length" style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 48px; text-align: center">
@@ -50,7 +50,7 @@ const folderIcon = { INBOX: 'ti-inbox', Sent: 'ti-send', Drafts: 'ti-file', Tras
             <!-- accounts + folders -->
             <div style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto">
                 <select :value="selected" @change="selectAccount(Number($event.target.value))" :style="field + ';margin-bottom:6px'">
-                    <option v-for="a in accounts" :key="a.id" :value="a.id">{{ a.email }}</option>
+                    <option v-for="a in accounts" :key="a.id" :value="a.id">{{ a.email }}{{ a.owner && !a.mine ? ' — ' + a.owner : '' }}</option>
                 </select>
                 <a v-for="f in folders" :key="f" href="#" @click.prevent="selectFolder(f)"
                     :style="`display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;font-size:13px;text-decoration:none;${f === folder ? 'background:rgba(91,91,214,.16);color:var(--cp-ink)' : 'color:var(--cp-mut)'}`">
@@ -63,6 +63,11 @@ const folderIcon = { INBOX: 'ti-inbox', Sent: 'ti-send', Drafts: 'ti-file', Tras
 
             <!-- message list -->
             <div style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; overflow-y: auto">
+                <div v-if="!canRead" style="padding: 30px 22px; text-align: center; font-size: 12.5px; color: var(--cp-dim); line-height: 1.6">
+                    <i class="ti ti-lock" style="font-size: 26px; display: block; margin-bottom: 10px; color: var(--cp-mut)" aria-hidden="true"></i>
+                    You can manage this mailbox (create, delete), but only its owner can read its email.
+                </div>
+                <template v-else>
                 <div v-if="error" style="padding: 24px; text-align: center; font-size: 12.5px; color: var(--cp-red)">{{ error }}</div>
                 <div v-else-if="!messages.length" style="padding: 36px; text-align: center; font-size: 12.5px; color: var(--cp-dim)">No messages in {{ folder === 'INBOX' ? 'Inbox' : folder }}.</div>
                 <a v-for="(m, i) in messages" :key="m.uid" href="#" @click.prevent="openMsg(m.uid)"
@@ -74,6 +79,7 @@ const folderIcon = { INBOX: 'ti-inbox', Sent: 'ti-send', Drafts: 'ti-file', Tras
                     </div>
                     <div :style="`font-size:12.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${m.seen ? 'color:var(--cp-mut)' : ''}`">{{ m.subject }}</div>
                 </a>
+                </template>
             </div>
 
             <!-- reading pane -->

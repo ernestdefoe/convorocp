@@ -41,19 +41,40 @@ class MailController extends Controller
 
     public function index(Request $request)
     {
-        $accounts = $this->scoped($request)->orderBy('email')->get(['id', 'email', 'domain', 'status']);
+        $me = (int) $request->user()->id;
+        $isOperator = $request->user()->isOperator();
 
-        $selected = $request->integer('account') ?: $accounts->first()?->id;
+        $accounts = $this->scoped($request)->with('user:id,name')->orderBy('email')
+            ->get(['id', 'email', 'domain', 'status', 'user_id'])
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'email' => $a->email,
+                'domain' => $a->domain,
+                'status' => $a->status,
+                // Whose mailbox this is — only the owner may read its contents.
+                'mine' => (int) $a->user_id === $me,
+                'owner' => $isOperator ? $a->user?->name : null,
+            ])->values();
+
+        // Default to one of the viewer's OWN mailboxes, never a customer's.
+        $selected = $request->integer('account')
+            ?: ($accounts->firstWhere('mine', true)['id'] ?? $accounts->first()['id'] ?? null);
         $folderName = in_array($request->query('folder'), ['INBOX', 'Sent', 'Drafts', 'Trash'], true) ? $request->query('folder') : 'INBOX';
         // Re-fetch the full model (with the encrypted secret) for server-side
         // IMAP; the $accounts list deliberately omits it so it never reaches the client.
         $account = $selected ? $this->scoped($request)->find($selected) : null;
 
+        // PRIVACY: reading mailbox contents is owner-only. An operator can list,
+        // create and delete any mailbox (account management), but must never be
+        // able to read another user's email — so the IMAP fetch below only runs
+        // for the viewer's own mailbox.
+        $canRead = $account && (int) $account->user_id === $me;
+
         $messages = [];
         $open = null;
         $error = null;
 
-        if ($account && $account->status === 'active') {
+        if ($account && $account->status === 'active' && $canRead) {
             try {
                 $client = $this->client($account);
                 $folder = $client->getFolder($folderName);
@@ -94,6 +115,7 @@ class MailController extends Controller
         return Inertia::render('Mail/Index', [
             'accounts' => $accounts,
             'selected' => $account?->id,
+            'canRead' => $canRead,
             'folder' => $folderName,
             'folders' => ['INBOX', 'Sent', 'Drafts', 'Trash'],
             'messages' => $messages,
@@ -140,7 +162,9 @@ class MailController extends Controller
 
     public function send(Request $request, MailAccount $account)
     {
-        abort_unless($request->user()->isOperator() || $account->user_id === $request->user()->id, 403);
+        // Sending is owner-only — an operator must not be able to send mail as
+        // someone else's mailbox (impersonation).
+        abort_unless((int) $account->user_id === (int) $request->user()->id, 403);
         $data = $request->validate([
             'to' => ['required', 'email'],
             'subject' => ['nullable', 'string', 'max:255'],
