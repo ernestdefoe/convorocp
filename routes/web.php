@@ -211,6 +211,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/mail', [MailController::class, 'index'])->name('mail.index');
     Route::post('/mail', [MailController::class, 'store'])->name('mail.store');
     Route::post('/mail/{account}/send', [MailController::class, 'send'])->name('mail.send');
+    Route::get('/mail/{account}/attachment', [MailController::class, 'attachment'])->name('mail.attachment');
+    Route::post('/mail/{account}/message', [MailController::class, 'message'])->name('mail.message');
     Route::delete('/mail/{account}', [MailController::class, 'destroy'])->name('mail.destroy');
 
     Route::get('/php', [PhpController::class, 'index'])->name('php.index');

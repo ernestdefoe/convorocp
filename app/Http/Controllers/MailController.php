@@ -13,6 +13,8 @@ use Webklex\PHPIMAP\ClientManager;
 
 class MailController extends Controller
 {
+    private const PER_PAGE = 30;
+
     private function scoped(Request $request)
     {
         return $request->user()->isOperator()
@@ -20,11 +22,22 @@ class MailController extends Controller
             : MailAccount::where('user_id', $request->user()->id);
     }
 
+    /** The mailbox the viewer is allowed to READ — owner-only (privacy). */
+    private function readable(Request $request, ?int $id): ?MailAccount
+    {
+        if (! $id) {
+            return null;
+        }
+        $account = MailAccount::where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        return $account && $account->status === 'active' ? $account : null;
+    }
+
     private function client(MailAccount $account)
     {
-        $cm = new ClientManager;
-
-        $client = $cm->make([
+        $client = (new ClientManager)->make([
             'host' => '127.0.0.1',
             'port' => 143,
             'encryption' => false,
@@ -51,34 +64,51 @@ class MailController extends Controller
                 'email' => $a->email,
                 'domain' => $a->domain,
                 'status' => $a->status,
-                // Whose mailbox this is — only the owner may read its contents.
                 'mine' => (int) $a->user_id === $me,
                 'owner' => $isOperator ? $a->user?->name : null,
             ])->values();
 
-        // Default to one of the viewer's OWN mailboxes, never a customer's.
         $selected = $request->integer('account')
             ?: ($accounts->firstWhere('mine', true)['id'] ?? $accounts->first()['id'] ?? null);
-        $folderName = in_array($request->query('folder'), ['INBOX', 'Sent', 'Drafts', 'Trash'], true) ? $request->query('folder') : 'INBOX';
-        // Re-fetch the full model (with the encrypted secret) for server-side
-        // IMAP; the $accounts list deliberately omits it so it never reaches the client.
-        $account = $selected ? $this->scoped($request)->find($selected) : null;
 
-        // PRIVACY: reading mailbox contents is owner-only. An operator can list,
-        // create and delete any mailbox (account management), but must never be
-        // able to read another user's email — so the IMAP fetch below only runs
-        // for the viewer's own mailbox.
-        $canRead = $account && (int) $account->user_id === $me;
+        // PRIVACY: only the mailbox owner may read its contents.
+        $account = $this->readable($request, $selected);
+        $canRead = (bool) $account;
 
+        $folders = [];
         $messages = [];
         $open = null;
         $error = null;
+        $page = max(1, $request->integer('page') ?: 1);
+        $hasMore = false;
+        $search = trim((string) $request->query('q', ''));
+        $folderName = (string) ($request->query('folder') ?: 'INBOX');
 
-        if ($account && $account->status === 'active' && $canRead) {
+        if ($account) {
             try {
                 $client = $this->client($account);
-                $folder = $client->getFolder($folderName);
-                $query = $folder->query()->all()->limit(40)->setFetchOrder('desc');
+                $folders = $this->listFolders($client);
+                // Fall back to INBOX if the requested folder doesn't exist.
+                if (! collect($folders)->firstWhere('path', $folderName)) {
+                    $folderName = 'INBOX';
+                }
+                $folder = $client->getFolderByPath($folderName) ?? $client->getFolder('INBOX');
+
+                $q = $folder->query()->setFetchOrder('desc');
+                $search !== '' ? $q->text($search) : $q->all();
+                $list = $q->limit(self::PER_PAGE, $page)->get();
+                $hasMore = $list->count() >= self::PER_PAGE;
+
+                foreach ($list as $m) {
+                    $messages[] = [
+                        'uid' => (int) $m->getUid(),
+                        'subject' => (string) $m->getSubject() ?: '(no subject)',
+                        'from' => $this->addr($m->getFrom()),
+                        'date' => optional($m->getDate()?->first())->diffForHumans(),
+                        'seen' => $m->getFlags()->has('Seen'),
+                        'attachments' => $m->getAttachments()->count(),
+                    ];
+                }
 
                 if ($uid = $request->integer('uid')) {
                     $msg = $folder->query()->getMessageByUid($uid);
@@ -86,24 +116,24 @@ class MailController extends Controller
                         $msg->setFlag('Seen');
                         $open = [
                             'uid' => (int) $uid,
+                            'folder' => $folderName,
                             'subject' => (string) $msg->getSubject(),
                             'from' => $this->addr($msg->getFrom()),
+                            'fromRaw' => $this->rawAddr($msg->getReplyTo() ?: $msg->getFrom()),
                             'to' => $this->addr($msg->getTo()),
+                            'cc' => $this->addr($msg->getCc()),
                             'date' => optional($msg->getDate()?->first())->toDayDateTimeString(),
+                            'messageId' => (string) $msg->getMessageId(),
                             'html' => $msg->hasHTMLBody() ? $msg->getHTMLBody() : null,
                             'text' => $msg->getTextBody(),
+                            'attachments' => $msg->getAttachments()->values()->map(fn ($att, $i) => [
+                                'index' => $i,
+                                'name' => $att->getName() ?: 'attachment-'.$i,
+                                'size' => $att->getSize(),
+                                'mime' => $att->getMimeType(),
+                            ])->all(),
                         ];
                     }
-                }
-
-                foreach ($query->get() as $m) {
-                    $messages[] = [
-                        'uid' => (int) $m->getUid(),
-                        'subject' => (string) $m->getSubject() ?: '(no subject)',
-                        'from' => $this->addr($m->getFrom()),
-                        'date' => optional($m->getDate()?->first())->diffForHumans(),
-                        'seen' => $m->getFlags()->has('Seen'),
-                    ];
                 }
                 $client->disconnect();
             } catch (\Throwable $e) {
@@ -117,11 +147,50 @@ class MailController extends Controller
             'selected' => $account?->id,
             'canRead' => $canRead,
             'folder' => $folderName,
-            'folders' => ['INBOX', 'Sent', 'Drafts', 'Trash'],
+            'folders' => $folders,
             'messages' => $messages,
             'open' => $open,
             'error' => $error,
+            'search' => $search,
+            'page' => $page,
+            'hasMore' => $hasMore,
         ]);
+    }
+
+    /** All folders with their unread counts, for the sidebar. */
+    private function listFolders($client): array
+    {
+        $out = [];
+        foreach ($client->getFolders(false) as $folder) {
+            $unread = 0;
+            try {
+                $status = $folder->examine();
+                $unread = (int) ($status['unseen'] ?? 0);
+            } catch (\Throwable) {
+            }
+            $path = $folder->path ?? $folder->name;
+            $out[] = [
+                'path' => $path,
+                'name' => $this->folderLabel($path),
+                'unread' => $unread,
+            ];
+        }
+
+        // Sort the well-known folders first, then the rest alphabetically.
+        $rank = ['INBOX' => 0, 'Drafts' => 1, 'Sent' => 2, 'Junk' => 3, 'Trash' => 4];
+        usort($out, fn ($a, $b) => [$rank[$a['path']] ?? 9, $a['name']] <=> [$rank[$b['path']] ?? 9, $b['name']]);
+
+        return $out;
+    }
+
+    private function folderLabel(string $path): string
+    {
+        if (strtoupper($path) === 'INBOX') {
+            return 'Inbox';
+        }
+        $parts = preg_split('/[\/.]/', $path);
+
+        return ucfirst((string) end($parts));
     }
 
     public function store(Request $request)
@@ -162,28 +231,125 @@ class MailController extends Controller
 
     public function send(Request $request, MailAccount $account)
     {
-        // Sending is owner-only — an operator must not be able to send mail as
-        // someone else's mailbox (impersonation).
+        // Owner-only — never let an operator send as someone else's mailbox.
         abort_unless((int) $account->user_id === (int) $request->user()->id, 403);
         $data = $request->validate([
-            'to' => ['required', 'email'],
+            'to' => ['required', 'string', 'max:2000'],
+            'cc' => ['nullable', 'string', 'max:2000'],
+            'bcc' => ['nullable', 'string', 'max:2000'],
             'subject' => ['nullable', 'string', 'max:255'],
             'body' => ['required', 'string'],
+            'html' => ['nullable', 'boolean'],
+            'in_reply_to' => ['nullable', 'string', 'max:512'],
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['file', 'max:25600'], // 25 MB each
         ]);
 
-        // Loopback relay to Postfix — no auth, and disable opportunistic STARTTLS
-        // (Postfix's self-signed cert CN won't match 127.0.0.1).
         $transport = new EsmtpTransport('127.0.0.1', 25);
         $transport->setAutoTls(false);
         $mailer = new Mailer($transport);
+
         $email = (new Email)
             ->from($account->email)
-            ->to($data['to'])
-            ->subject($data['subject'] ?? '(no subject)')
-            ->text($data['body']);
+            ->subject($data['subject'] ?? '(no subject)');
+
+        foreach ($this->parseAddrs($data['to']) as $addr) {
+            $email->addTo($addr);
+        }
+        foreach ($this->parseAddrs($data['cc'] ?? '') as $addr) {
+            $email->addCc($addr);
+        }
+        foreach ($this->parseAddrs($data['bcc'] ?? '') as $addr) {
+            $email->addBcc($addr);
+        }
+        abort_if(empty($email->getTo()), 422, 'At least one valid recipient is required.');
+
+        $request->boolean('html')
+            ? $email->html($data['body'])->text(strip_tags($data['body']))
+            : $email->text($data['body']);
+
+        if (! empty($data['in_reply_to'])) {
+            $email->getHeaders()->addTextHeader('In-Reply-To', $data['in_reply_to']);
+            $email->getHeaders()->addTextHeader('References', $data['in_reply_to']);
+        }
+
+        foreach ((array) $request->file('attachments', []) as $file) {
+            $email->attachFromPath($file->getRealPath(), $file->getClientOriginalName(), $file->getClientMimeType());
+        }
+
         $mailer->send($email);
 
         return back();
+    }
+
+    /** Stream one attachment from a message (owner-only). */
+    public function attachment(Request $request, MailAccount $account)
+    {
+        abort_unless((int) $account->user_id === (int) $request->user()->id, 403);
+        $folderName = (string) ($request->query('folder') ?: 'INBOX');
+        $uid = $request->integer('uid');
+        $index = $request->integer('index');
+
+        try {
+            $client = $this->client($account);
+            $folder = $client->getFolderByPath($folderName) ?? $client->getFolder('INBOX');
+            $msg = $folder->query()->getMessageByUid($uid);
+            $att = $msg?->getAttachments()->values()->get($index);
+            abort_unless($att, 404);
+
+            $name = preg_replace('/[^A-Za-z0-9._-]/', '_', $att->getName() ?: 'attachment') ?: 'attachment';
+            $content = $att->getContent();
+            $client->disconnect();
+
+            return response($content, 200, [
+                'Content-Type' => $att->getMimeType() ?: 'application/octet-stream',
+                'Content-Disposition' => 'attachment; filename="'.$name.'"',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+            abort(404);
+        }
+    }
+
+    /** Mark seen/unseen, delete (→ Trash), or move a message (owner-only). */
+    public function message(Request $request, MailAccount $account)
+    {
+        abort_unless((int) $account->user_id === (int) $request->user()->id, 403);
+        $data = $request->validate([
+            'uid' => ['required', 'integer'],
+            'folder' => ['required', 'string', 'max:191'],
+            'action' => ['required', 'in:seen,unseen,delete,move'],
+            'target' => ['nullable', 'string', 'max:191'],
+        ]);
+
+        try {
+            $client = $this->client($account);
+            $folder = $client->getFolderByPath($data['folder']) ?? $client->getFolder('INBOX');
+            $msg = $folder->query()->getMessageByUid($data['uid']);
+            if ($msg) {
+                match ($data['action']) {
+                    'seen' => $msg->setFlag('Seen'),
+                    'unseen' => $msg->unsetFlag('Seen'),
+                    'delete' => strtoupper($data['folder']) === 'TRASH' ? $msg->delete() : $msg->move('Trash'),
+                    'move' => $data['target'] ? $msg->move($data['target']) : null,
+                };
+            }
+            $client->disconnect();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return back();
+    }
+
+    /** @return string[] */
+    private function parseAddrs(string $raw): array
+    {
+        return collect(preg_split('/[,;\s]+/', $raw))
+            ->map(fn ($a) => trim($a))
+            ->filter(fn ($a) => filter_var($a, FILTER_VALIDATE_EMAIL))
+            ->unique()->values()->all();
     }
 
     private function addr($collection): string
@@ -194,5 +360,12 @@ class MailController extends Controller
         }
 
         return trim(($a->personal ?: '').' <'.$a->mail.'>');
+    }
+
+    private function rawAddr($collection): string
+    {
+        $a = is_iterable($collection) ? collect($collection)->first() : null;
+
+        return $a ? (string) $a->mail : '';
     }
 }
