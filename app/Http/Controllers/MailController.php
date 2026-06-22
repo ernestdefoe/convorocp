@@ -102,7 +102,7 @@ class MailController extends Controller
                 foreach ($list as $m) {
                     $messages[] = [
                         'uid' => (int) $m->getUid(),
-                        'subject' => (string) $m->getSubject() ?: '(no subject)',
+                        'subject' => $this->decodeHeader((string) $m->getSubject()) ?: '(no subject)',
                         'from' => $this->addr($m->getFrom()),
                         'date' => optional($m->getDate()?->first())->diffForHumans(),
                         'seen' => $m->getFlags()->has('Seen'),
@@ -117,7 +117,7 @@ class MailController extends Controller
                         $open = [
                             'uid' => (int) $uid,
                             'folder' => $folderName,
-                            'subject' => (string) $msg->getSubject(),
+                            'subject' => $this->decodeHeader((string) $msg->getSubject()),
                             'from' => $this->addr($msg->getFrom()),
                             'fromRaw' => $this->rawAddr($msg->getReplyTo() ?: $msg->getFrom()),
                             'to' => $this->addr($msg->getTo()),
@@ -359,7 +359,23 @@ class MailController extends Controller
             return '';
         }
 
-        return trim(($a->personal ?: '').' <'.$a->mail.'>');
+        return trim($this->decodeHeader((string) ($a->personal ?: '')).' <'.$a->mail.'>');
+    }
+
+    /**
+     * Decode RFC 2047 MIME encoded-words (=?utf-8?Q?…?= / =?…?B?…?=) to plain
+     * UTF-8. webklex decodes most headers, but lets oversized single encoded-
+     * words (longer than RFC 2047's 75-char limit, which some senders emit)
+     * through raw — so we decode here as a safety net. No-op for plain headers.
+     */
+    private function decodeHeader(string $s): string
+    {
+        if ($s === '' || ! str_contains($s, '=?')) {
+            return $s;
+        }
+        $decoded = @iconv_mime_decode($s, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+
+        return $decoded !== false && $decoded !== '' ? $decoded : $s;
     }
 
     private function rawAddr($collection): string
