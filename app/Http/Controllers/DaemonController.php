@@ -23,11 +23,16 @@ class DaemonController extends Controller
 
     public function index(Request $request)
     {
+        $live = $this->liveStatuses();
+        if ($request->user()->isOperator()) {
+            $this->discover($live, $request->user()->id);
+        }
+
         $daemons = $this->scoped($request)->latest()->get()->map(fn (Daemon $d) => [
             'id' => $d->id,
             'name' => $d->name,
             'command' => $d->command,
-            'status' => $d->status,
+            'status' => $live[$d->unitName()] ?? $d->status,
             'autostart' => $d->autostart,
             'restart_policy' => $d->restart_policy,
             'adopted' => $d->adopted,
@@ -35,6 +40,48 @@ class DaemonController extends Controller
         ]);
 
         return Inertia::render('Daemons/Index', ['daemons' => $daemons]);
+    }
+
+    /** Live systemd state for every site daemon + the agent (unit => active|inactive|...). */
+    private function liveStatuses(): array
+    {
+        $r = \Illuminate\Support\Facades\Process::timeout(8)->run([
+            'systemctl', 'list-units', '--type=service', '--all', '--no-legend', '--plain',
+            '*-ssr.service', '*-reverb.service', '*-horizon.service', '*-worker.service', 'convorocp-agent.service',
+        ]);
+        $out = [];
+        foreach (preg_split('/?
+/', trim($r->output())) as $line) {
+            if ($line === '') { continue; }
+            $c = preg_split('/\s+/', trim($line));
+            $unit = $c[0] ?? '';
+            if (str_ends_with($unit, '.service')) {
+                $out[$unit] = $c[2] ?? 'unknown';
+            }
+        }
+        return $out;
+    }
+
+    /** Auto-adopt any site daemon (another forum's ssr/reverb/horizon/worker, etc.)
+     *  ConvoroCP is not tracking yet, so every daemon on the node shows. */
+    private function discover(array $live, int $ownerId): void
+    {
+        $known = Daemon::query()->whereNotNull('unit')->pluck('unit')->all();
+        foreach (array_keys($live) as $unit) {
+            if (in_array($unit, $known, true)) {
+                continue;
+            }
+            Daemon::create([
+                'user_id' => $ownerId,
+                'name' => ucwords(str_replace(['-', '.service'], [' ', ''], $unit)),
+                'command' => '(external unit)',
+                'status' => $live[$unit] ?? 'running',
+                'autostart' => true,
+                'restart_policy' => 'always',
+                'adopted' => true,
+                'unit' => $unit,
+            ]);
+        }
     }
 
     /**
