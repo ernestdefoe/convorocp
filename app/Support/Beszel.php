@@ -99,6 +99,50 @@ class Beszel
         }
     }
 
+    /**
+     * Recent percentage series (oldest → newest) for the Overview sparkline
+     * charts: ['cpu' => [...], 'memory' => [...], 'disk' => [...]], or null.
+     */
+    public function history(int $points = 60): ?array
+    {
+        $base = $this->base();
+        $token = $this->token();
+        if (! $base || ! $token) {
+            return null;
+        }
+
+        try {
+            $headers = ['Authorization' => $token];
+            $id = Http::timeout(4)->withHeaders($headers)
+                ->get("$base/api/collections/systems/records", ['perPage' => 1, 'sort' => 'updated', 'fields' => 'id'])
+                ->json('items.0.id');
+            if (! $id) {
+                return null;
+            }
+
+            $items = Http::timeout(5)->withHeaders($headers)
+                ->get("$base/api/collections/system_stats/records", [
+                    'perPage' => max(2, $points),
+                    'sort' => '-created',
+                    'filter' => "system='$id'",
+                    'fields' => 'stats',
+                ])->json('items') ?? [];
+            $items = array_reverse($items);
+
+            $cpu = $mem = $disk = [];
+            foreach ($items as $r) {
+                $s = $r['stats'] ?? [];
+                $cpu[] = round((float) ($s['cpu'] ?? 0), 2);
+                $mem[] = round((float) ($s['mp'] ?? 0), 2);
+                $disk[] = round((float) ($s['dp'] ?? 0), 2);
+            }
+
+            return $cpu ? ['cpu' => $cpu, 'memory' => $mem, 'disk' => $disk] : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     protected function humanUptime(int $s): string
     {
         if ($s <= 0) {

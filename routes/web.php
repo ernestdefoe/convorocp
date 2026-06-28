@@ -61,13 +61,18 @@ Route::middleware('auth')->get('/', function (Request $request) {
         // Node health: prefer live Beszel metrics (history-backed) when monitoring
         // is set up, falling back to the local /proc snapshot when it's unreachable.
         $node = \App\Support\NodeInfo::detail();
-        if (config('convorocp.monitoring.enabled') && ($bz = app(\App\Support\Beszel::class)->metrics())) {
-            $node['metrics']['cpu'] = array_merge($node['metrics']['cpu'], $bz['cpu']);
-            $node['metrics']['memory'] = $bz['memory'];
-            $node['metrics']['disk'] = $bz['disk'];
-            $node['metrics']['uptime'] = $bz['uptime'];
-            $node['metrics']['load'] = $bz['load'];
-            $node['beszel'] = true;
+        $beszelHistory = null;
+        if (config('convorocp.monitoring.enabled')) {
+            $beszel = app(\App\Support\Beszel::class);
+            if ($bz = $beszel->metrics()) {
+                $node['metrics']['cpu'] = array_merge($node['metrics']['cpu'], $bz['cpu']);
+                $node['metrics']['memory'] = $bz['memory'];
+                $node['metrics']['disk'] = $bz['disk'];
+                $node['metrics']['uptime'] = $bz['uptime'];
+                $node['metrics']['load'] = $bz['load'];
+                $node['beszel'] = true;
+                $beszelHistory = $beszel->history(60);
+            }
         }
 
         return Inertia::render('OperatorDashboard', [
@@ -92,6 +97,7 @@ Route::middleware('auth')->get('/', function (Request $request) {
                 'price' => '$'.number_format($p->price_cents / 100, 0).'/mo',
             ]),
             'node' => $node,
+            'beszelHistory' => $beszelHistory,
         ]);
     }
 

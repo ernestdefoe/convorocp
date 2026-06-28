@@ -1,9 +1,19 @@
 <script setup>
 import AppLayout from '../Layouts/AppLayout.vue';
 
-defineProps({ metrics: Array, customers: Array, node: Object, plans: { type: Array, default: () => [] }, customersTotal: { type: Number, default: 0 } });
+defineProps({ metrics: Array, customers: Array, node: Object, plans: { type: Array, default: () => [] }, customersTotal: { type: Number, default: 0 }, beszelHistory: { type: Object, default: null } });
 
 const tone = (t) => ({ grn: 'var(--cp-grn)', amb: 'var(--cp-amb)', cy: 'var(--cp-cy)', mut: 'var(--cp-mut)' }[t] || 'var(--cp-mut)');
+
+// Build an SVG area + line path (viewBox 0 0 100 40) from a percentage series.
+const spark = (arr, w = 100, h = 40) => {
+    if (!arr || arr.length < 2) return { line: '', fill: '' };
+    const max = Math.max(5, Math.max(...arr) * 1.15);
+    const n = arr.length;
+    const pt = (v, i) => `${((i / (n - 1)) * w).toFixed(1)},${(h - Math.min(1, v / max) * h).toFixed(1)}`;
+    const line = 'M' + arr.map(pt).join(' L');
+    return { line, fill: `${line} L${w},${h} L0,${h} Z` };
+};
 const planStyle = (p) => ({
     Business: 'background:rgba(139,139,240,.18);color:var(--cp-vio)',
     Pro: 'background:rgba(52,211,153,.16);color:var(--cp-grn)',
@@ -57,13 +67,19 @@ const planStyle = (p) => ({
             </div>
             <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px">
                 <div style="display: flex; align-items: center; margin-bottom: 12px"><span style="font-size: 13px; font-weight: 600; flex: 1">{{ node.name }} · node health</span><a v-if="node.beszel" href="/monitoring" title="Live via Beszel — open full dashboard" style="font-size: 10.5px; color: var(--cp-ind); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; margin-right: 12px"><i class="ti ti-activity-heartbeat" style="font-size: 12px" aria-hidden="true"></i>Beszel</a><span style="font-size: 11px; color: var(--cp-grn); display: inline-flex; align-items: center; gap: 4px"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--cp-grn)"></span>up {{ node.metrics.uptime }}</span></div>
-                <div v-for="bar in [
-                    { label: 'CPU', pct: node.metrics.cpu.pct, detail: node.metrics.cpu.load + ' load · ' + node.metrics.cpu.cores + ' cores', color: 'var(--cp-ind)' },
-                    { label: 'Memory', pct: node.metrics.memory.pct, detail: node.metrics.memory.used_mb + ' / ' + node.metrics.memory.total_mb + ' MB', color: 'var(--cp-vio)' },
-                    { label: 'Disk', pct: node.metrics.disk.pct, detail: node.metrics.disk.used_gb + ' / ' + node.metrics.disk.total_gb + ' GB', color: 'var(--cp-cy)' },
-                ]" :key="bar.label" style="margin-bottom: 10px">
-                    <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px"><span style="color: var(--cp-mut)">{{ bar.label }} <span style="color: var(--cp-dim)">{{ bar.detail }}</span></span><span style="color: var(--cp-mut)">{{ bar.pct }}%</span></div>
-                    <div style="height: 5px; border-radius: 4px; background: var(--cp-soft)"><div :style="`width:${bar.pct}%;height:100%;border-radius:4px;background:${bar.color}`"></div></div>
+                <!-- Beszel history graphs (preferred); falls back to plain bars when the hub is off. -->
+                <div v-for="g in [
+                    { key: 'cpu', label: 'CPU', series: beszelHistory && beszelHistory.cpu, pct: node.metrics.cpu.pct, detail: node.metrics.cpu.load + ' load · ' + node.metrics.cpu.cores + ' cores', color: 'var(--cp-ind)' },
+                    { key: 'memory', label: 'Memory', series: beszelHistory && beszelHistory.memory, pct: node.metrics.memory.pct, detail: node.metrics.memory.used_mb + ' / ' + node.metrics.memory.total_mb + ' MB', color: 'var(--cp-vio)' },
+                    { key: 'disk', label: 'Disk', series: beszelHistory && beszelHistory.disk, pct: node.metrics.disk.pct, detail: node.metrics.disk.used_gb + ' / ' + node.metrics.disk.total_gb + ' GB', color: 'var(--cp-cy)' },
+                ]" :key="g.key" style="margin-bottom: 12px">
+                    <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px"><span style="color: var(--cp-mut)">{{ g.label }} <span style="color: var(--cp-dim)">{{ g.detail }}</span></span><span style="color: var(--cp-mut)">{{ g.pct }}%</span></div>
+                    <svg v-if="beszelHistory" viewBox="0 0 100 40" preserveAspectRatio="none" style="width: 100%; height: 38px; display: block">
+                        <defs><linearGradient :id="`bz-${g.key}`" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" :stop-color="g.color" stop-opacity="0.35" /><stop offset="100%" :stop-color="g.color" stop-opacity="0" /></linearGradient></defs>
+                        <path :d="spark(g.series).fill" :fill="`url(#bz-${g.key})`" />
+                        <path :d="spark(g.series).line" fill="none" :stroke="g.color" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+                    </svg>
+                    <div v-else style="height: 5px; border-radius: 4px; background: var(--cp-soft)"><div :style="`width:${g.pct}%;height:100%;border-radius:4px;background:${g.color}`"></div></div>
                 </div>
             </div>
         </div>
