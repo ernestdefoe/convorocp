@@ -62,7 +62,15 @@ In `.env`:
 CONVOROCP_MONITORING_ENABLED=true
 CONVOROCP_MONITORING_PORT=8443
 # CONVOROCP_MONITORING_URL=https://server.example.com:8443   # optional override
+
+# Read-only API access so the Overview "node health" panel renders live Beszel
+# metrics server-side (no Beszel login needed there). Use the dashboard account.
+BESZEL_API_URL=http://127.0.0.1:8099
+BESZEL_API_EMAIL=you@example.com
+BESZEL_API_PASSWORD=the-dashboard-password
 ```
 
 `php artisan config:clear`, reload the panel. The Monitoring nav item now shows the
-live dashboard (operator logs into Beszel once with the dashboard user).
+live dashboard (operator logs into Beszel once with the dashboard user), and the
+operator **Overview** node-health panel is fed by Beszel (`App\Support\Beszel`),
+falling back to the local /proc snapshot if the hub is unreachable.

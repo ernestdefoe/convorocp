@@ -61,6 +61,11 @@ return [
         'enabled' => (bool) env('CONVOROCP_MONITORING_ENABLED', false),
         'port' => env('CONVOROCP_MONITORING_PORT', 8443),
         'url' => env('CONVOROCP_MONITORING_URL'),
+        // Read-only API access so the Overview node-health panel can render live
+        // Beszel metrics server-side (no iframe login needed there).
+        'api_url' => env('BESZEL_API_URL', 'http://127.0.0.1:8099'),
+        'api_email' => env('BESZEL_API_EMAIL'),
+        'api_password' => env('BESZEL_API_PASSWORD'),
     ],
 
     /*

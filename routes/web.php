@@ -58,6 +58,18 @@ Route::middleware('auth')->get('/', function (Request $request) {
         $mrr = $clients->sum(fn ($u) => $u->plan?->price_cents ?? 0) / 100;
         $initials = fn ($n) => collect(explode(' ', $n))->map(fn ($p) => mb_substr($p, 0, 1))->take(2)->implode('');
 
+        // Node health: prefer live Beszel metrics (history-backed) when monitoring
+        // is set up, falling back to the local /proc snapshot when it's unreachable.
+        $node = \App\Support\NodeInfo::detail();
+        if (config('convorocp.monitoring.enabled') && ($bz = app(\App\Support\Beszel::class)->metrics())) {
+            $node['metrics']['cpu'] = array_merge($node['metrics']['cpu'], $bz['cpu']);
+            $node['metrics']['memory'] = $bz['memory'];
+            $node['metrics']['disk'] = $bz['disk'];
+            $node['metrics']['uptime'] = $bz['uptime'];
+            $node['metrics']['load'] = $bz['load'];
+            $node['beszel'] = true;
+        }
+
         return Inertia::render('OperatorDashboard', [
             'metrics' => [
                 ['label' => 'MRR', 'value' => '$'.number_format($mrr, 0), 'sub' => 'recurring', 'tone' => 'grn'],
@@ -79,7 +91,7 @@ Route::middleware('auth')->get('/', function (Request $request) {
                 'subs' => \App\Models\User::where('plan_id', $p->id)->count(),
                 'price' => '$'.number_format($p->price_cents / 100, 0).'/mo',
             ]),
-            'node' => \App\Support\NodeInfo::detail(),
+            'node' => $node,
         ]);
     }
 

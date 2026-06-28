@@ -56,7 +56,7 @@ const planStyle = (p) => ({
                 </div>
             </div>
             <div style="border: 1px solid var(--cp-ln); border-radius: 13px; background: var(--cp-card); padding: 13px 14px">
-                <div style="display: flex; align-items: center; margin-bottom: 12px"><span style="font-size: 13px; font-weight: 600; flex: 1">{{ node.name }} · node health</span><span style="font-size: 11px; color: var(--cp-grn); display: inline-flex; align-items: center; gap: 4px"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--cp-grn)"></span>up {{ node.metrics.uptime }}</span></div>
+                <div style="display: flex; align-items: center; margin-bottom: 12px"><span style="font-size: 13px; font-weight: 600; flex: 1">{{ node.name }} · node health</span><a v-if="node.beszel" href="/monitoring" title="Live via Beszel — open full dashboard" style="font-size: 10.5px; color: var(--cp-ind); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; margin-right: 12px"><i class="ti ti-activity-heartbeat" style="font-size: 12px" aria-hidden="true"></i>Beszel</a><span style="font-size: 11px; color: var(--cp-grn); display: inline-flex; align-items: center; gap: 4px"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--cp-grn)"></span>up {{ node.metrics.uptime }}</span></div>
                 <div v-for="bar in [
                     { label: 'CPU', pct: node.metrics.cpu.pct, detail: node.metrics.cpu.load + ' load · ' + node.metrics.cpu.cores + ' cores', color: 'var(--cp-ind)' },
                     { label: 'Memory', pct: node.metrics.memory.pct, detail: node.metrics.memory.used_mb + ' / ' + node.metrics.memory.total_mb + ' MB', color: 'var(--cp-vio)' },
