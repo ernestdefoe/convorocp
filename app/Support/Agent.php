@@ -29,7 +29,7 @@ class Agent
         'container.run', 'container.start', 'container.stop', 'container.remove',
         'backup.run', 'backup.restore', 'backup.delete',
         'mail.account_create', 'mail.account_delete',
-        'service.control',
+        'service.control', 'service.install',
         'firewall.allow', 'firewall.remove', 'firewall.enable', 'firewall.disable',
         'fail2ban.install', 'fail2ban.unban', 'fail2ban.ban',
         'panel.update',

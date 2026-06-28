@@ -180,6 +180,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
     Route::post('/services/control', [ServiceController::class, 'control'])->name('services.control');
+    Route::post('/services/install', [ServiceController::class, 'install'])->name('services.install');
 
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
 

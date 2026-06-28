@@ -44,6 +44,7 @@ class AgentHandlers
         'system.reboot' => 'systemReboot',
         'app.install' => 'appInstall',
         'service.control' => 'serviceControl',
+        'service.install' => 'serviceInstall',
         'firewall.allow' => 'firewallRule',
         'firewall.remove' => 'firewallRemove',
         'firewall.enable' => 'firewallEnable',
@@ -1210,6 +1211,34 @@ class AgentHandlers
         return ['applied' => true, 'service' => $svc, 'action' => $action];
     }
 
+    /** Services the panel can install on demand (service name => apt package). */
+    public static function serviceInstallPackages(): array
+    {
+        return ['postgresql' => 'postgresql'];
+    }
+
+    public static function serviceInstallable(string $s): bool
+    {
+        return array_key_exists($s, self::serviceInstallPackages());
+    }
+
+    private static function serviceInstall(array $args): array
+    {
+        $svc = (string) ($args['service'] ?? '');
+        $pkgs = self::serviceInstallPackages();
+        if (! isset($pkgs[$svc])) {
+            throw new \RuntimeException("Service [{$svc}] is not installable.");
+        }
+        $pkg = $pkgs[$svc];
+        $r = self::run(['bash', '-c', 'DEBIAN_FRONTEND=noninteractive apt-get install -y -q '.escapeshellarg($pkg)], 900);
+        if (! $r->successful()) {
+            throw new \RuntimeException("apt-get install {$pkg} failed: ".trim($r->errorOutput()));
+        }
+        self::run(['systemctl', 'enable', '--now', $svc]);
+
+        return ['applied' => true, 'service' => $svc, 'package' => $pkg];
+    }
+
     // ---- Backups --------------------------------------------------------
 
     private static function backupRun(array $args): array
@@ -1793,6 +1822,7 @@ class AgentHandlers
             $op === 'system.upgrade' => ($args['mode'] ?? 'all') === 'security' ? 'install OS security updates' : 'apt-get dist-upgrade (incl. kernel)',
             $op === 'system.reboot' => 'reboot the server (+1 min)',
             $op === 'service.control' => ($args['action'] ?? 'restart').' '.($args['service'] ?? ''),
+            $op === 'service.install' => 'install + enable '.($args['service'] ?? ''),
             str_starts_with($op, 'firewall.') => 'ufw '.substr($op, 9).' '.($args['port'] ?? ''),
             $op === 'fail2ban.install' => 'install + configure fail2ban',
             str_starts_with($op, 'fail2ban.') => 'fail2ban '.substr($op, 9).' '.($args['ip'] ?? ''),

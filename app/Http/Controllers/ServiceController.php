@@ -28,10 +28,13 @@ class ServiceController extends Controller
             $list[] = [$name, $label];
         }
 
+        $installable = AgentHandlers::serviceInstallPackages();
         $services = collect($list)->map(fn ($s) => [
             'name' => $s[0],
             'label' => $s[1],
             'status' => trim(Process::timeout(5)->run(['systemctl', 'is-active', $s[0]])->output()) ?: 'unknown',
+            'installed' => trim(Process::timeout(5)->run(['systemctl', 'list-unit-files', '--no-legend', $s[0].'.service'])->output()) !== '',
+            'installable' => array_key_exists($s[0], $installable),
         ]);
 
         return Inertia::render('Services/Index', ['services' => $services]);
@@ -47,6 +50,17 @@ class ServiceController extends Controller
         abort_unless(AgentHandlers::serviceControllable($data['service']), 422);
 
         Agent::dispatch('service.control', ['service' => $data['service'], 'action' => $data['action']]);
+
+        return back();
+    }
+
+    public function install(Request $request)
+    {
+        $this->ensureOperator($request);
+        $data = $request->validate(['service' => ['required', 'string']]);
+        abort_unless(AgentHandlers::serviceInstallable($data['service']), 422);
+
+        Agent::dispatch('service.install', ['service' => $data['service']]);
 
         return back();
     }
