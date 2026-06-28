@@ -31,14 +31,26 @@ class NodeInfo
             'kernel' => php_uname('r'),
             'php' => PHP_VERSION,
             'metrics' => ServerMetrics::snapshot(),
-            'counts' => [
-                'sites' => Site::count(),
-                'databases' => Database::count(),
-                'containers' => class_exists(Container::class) ? Container::count() : 0,
-                'mailboxes' => class_exists(MailAccount::class) ? MailAccount::count() : 0,
-                'customers' => User::where('role', 'client')->count(),
-            ],
+            'counts' => self::counts(),
             'services' => self::services(),
+        ];
+    }
+
+    private static function counts(): array
+    {
+        $real = [];
+        $f = storage_path('app/node-counts.json');
+        if (is_file($f)) {
+            $d = json_decode((string) file_get_contents($f), true);
+            if (is_array($d)) { $real = $d; }
+        }
+
+        return [
+            'sites' => Site::count(),
+            'databases' => $real['databases'] ?? Database::count(),
+            'containers' => $real['containers'] ?? (class_exists(Container::class) ? Container::count() : 0),
+            'mailboxes' => $real['mailboxes'] ?? (class_exists(MailAccount::class) ? MailAccount::count() : 0),
+            'customers' => User::where('role', 'client')->count(),
         ];
     }
 

@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { useForm, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
-defineProps({ containers: Array, dockerInstalled: { type: Boolean, default: true } });
+defineProps({ containers: Array, dockerInstalled: { type: Boolean, default: true }, running: { type: Array, default: () => [] } });
 const isOperator = usePage().props.auth?.user?.role === 'operator';
 const installDocker = () => router.post('/docker/install', {}, { preserveScroll: true });
 
@@ -100,6 +100,20 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
         </div>
         <div v-else style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; padding: 40px; text-align: center; color: var(--cp-dim); font-size: 13px">
             No containers yet. Deploy any image from Docker Hub.
+        </div>
+        <div v-if="running.length" style="margin-top: 24px">
+            <h3 style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--cp-dim); margin: 0 0 10px">Running on this node ({{ running.length }})</h3>
+            <div style="background: var(--cp-card); border: 1px solid var(--cp-ln); border-radius: 13px; overflow: hidden">
+                <div v-for="(r, i) in running" :key="r.name" :style="`display:flex;align-items:center;gap:12px;padding:12px 15px;font-size:13px;${i < running.length - 1 ? 'border-bottom:1px solid var(--cp-ln)' : ''}`">
+                    <i class="ti ti-brand-docker" :style="`font-size:19px;color:${r.state === 'running' ? 'var(--cp-cy)' : 'var(--cp-dim)'}`" aria-hidden="true"></i>
+                    <div style="flex: 1; min-width: 0">
+                        <div style="font-weight: 500">{{ r.name }} <span style="font-size: 11px; color: var(--cp-dim); font-weight: 400; font-family: ui-monospace, monospace">{{ r.image }}</span></div>
+                        <div v-if="r.ports" style="font-size: 11px; color: var(--cp-dim); font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ r.ports }}</div>
+                    </div>
+                    <span :style="`font-size:10.5px;font-weight:500;padding:2px 9px;border-radius:999px;${r.state === 'running' ? 'background:rgba(52,211,153,.16);color:var(--cp-grn)' : 'background:var(--cp-soft);color:var(--cp-mut)'}`">{{ r.status }}</span>
+                </div>
+            </div>
+            <p style="font-size: 11px; color: var(--cp-dim); margin: 9px 2px 0">Live view of every Docker container on the server, refreshed every few seconds.</p>
         </div>
     </AppLayout>
 </template>

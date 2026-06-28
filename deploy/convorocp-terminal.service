@@ -3,10 +3,14 @@ Description=ConvoroCP web terminal (ttyd) — serves an interactive PTY on loopb
 After=network.target
 
 [Service]
-# Bound to 127.0.0.1 only — never expose ttyd directly. -b /tty matches the
-# nginx proxy base path so ttyd's assets resolve under /tty/. -W = writable
-# (accept keyboard input). Runs as root → operator gets a root shell on the node.
-ExecStart=/usr/bin/ttyd -b /tty -i 127.0.0.1 -p 13715 -W bash
+# Bound to the loopback interface only — never expose ttyd directly. NOTE: ttyd's
+# -i takes an INTERFACE NAME (or unix socket), not an IP — use `lo`, not 127.0.0.1
+# (newer libwebsockets rejects an IP here: "lws_create_vhost: init server failed").
+# -b /tty matches the nginx proxy base path so ttyd's assets resolve under /tty/.
+# -W = writable (accept keyboard input). Runs as root → operator gets a root shell.
+# -p must be a free port; if 13715 collides with another service on the box (e.g. a
+# Convoro SSR sidecar), change it here and in the nginx /tty/ proxy_pass to match.
+ExecStart=/usr/bin/ttyd -b /tty -i lo -p 13715 -W bash
 Restart=always
 RestartSec=3
 

@@ -37,6 +37,7 @@ class ContainerController extends Controller
         return Inertia::render('Containers/Index', [
             'containers' => $containers,
             'dockerInstalled' => self::dockerInstalled(),
+            'running' => self::dockerSnapshot(),
         ]);
     }
 
@@ -44,6 +45,22 @@ class ContainerController extends Controller
     private static function dockerInstalled(): bool
     {
         return is_executable('/usr/bin/docker') || is_executable('/usr/local/bin/docker');
+    }
+
+    /** Live `docker ps` snapshot written by the agent loop. */
+    private static function dockerSnapshot(): array
+    {
+        $f = storage_path('app/docker-ps.json');
+        if (! is_file($f)) { return []; }
+        $out = [];
+        foreach (preg_split('/?
+/', trim((string) file_get_contents($f))) as $line) {
+            if ($line === '') { continue; }
+            $d = json_decode($line, true);
+            if (! is_array($d)) { continue; }
+            $out[] = ['name' => $d['Names'] ?? '', 'image' => $d['Image'] ?? '', 'status' => $d['Status'] ?? '', 'state' => $d['State'] ?? '', 'ports' => $d['Ports'] ?? ''];
+        }
+        return $out;
     }
 
     /** Install the Docker engine (operator only). */
