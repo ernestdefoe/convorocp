@@ -51,6 +51,7 @@ class AppController extends Controller
         $data = $request->validate([
             'app' => ['required', 'string'],
             'domain' => ['required', 'string', 'max:191'],
+            'version' => ['nullable', 'string', 'in:1,2'],
         ]);
         abort_unless(array_key_exists($data['app'], self::CATALOG), 422, 'Unknown app.');
         abort_unless($this->sites($request)->contains($data['domain']), 422, 'You don’t own that site.');
@@ -66,6 +67,7 @@ class AppController extends Controller
             'install_id' => $install->id,
             'app' => $data['app'],
             'domain' => $data['domain'],
+            'version' => $data['version'] ?? null,
         ]);
 
         return redirect('/apps');

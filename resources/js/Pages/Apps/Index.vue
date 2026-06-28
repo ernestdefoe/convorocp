@@ -6,7 +6,7 @@ import AppLayout from '../../Layouts/AppLayout.vue';
 const props = defineProps({ catalog: Array, sites: Array, installs: Array });
 
 const picked = ref(null);
-const form = useForm({ app: '', domain: '' });
+const form = useForm({ app: '', domain: '', version: '2' });
 
 function choose(app) {
     if (!props.sites.length) return;
@@ -68,6 +68,12 @@ const field = 'box-sizing:border-box;width:100%;background:var(--cp-card2);borde
                 </div>
                 <label style="font-size: 11.5px; color: var(--cp-mut)">Install onto site
                     <select v-model="form.domain" :style="field + ';margin-top:5px;display:block'"><option v-for="s in sites" :key="s" :value="s">{{ s }}</option></select>
+                </label>
+                <label v-if="picked.key === 'flarum'" style="font-size: 11.5px; color: var(--cp-mut); display: block; margin-top: 11px">Flarum version
+                    <select v-model="form.version" :style="field + ';margin-top:5px;display:block'">
+                        <option value="2">2.x — latest (release candidate)</option>
+                        <option value="1">1.x — stable</option>
+                    </select>
                 </label>
                 <p v-if="picked.db" style="font-size: 11px; color: var(--cp-dim); margin: 10px 0 0">A dedicated database will be created automatically.</p>
                 <p style="font-size: 11px; color: var(--cp-amb); margin: 8px 0 0">This installs into the site root and overwrites the placeholder page.</p>

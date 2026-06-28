@@ -336,13 +336,25 @@ class AgentHandlers
         $cmd = ['certbot', '--nginx', '-d', $domain, '--non-interactive', '--agree-tos', '-m', $email, '--redirect', '--keep-until-expiring'];
         if ($staging) {
             $cmd[] = '--staging';
+        } elseif (is_file("/etc/letsencrypt/live/{$domain}/cert.pem")) {
+            // Issuing real but a staging/test cert is already on disk → force a real
+            // reissue IN PLACE. (Never `certbot delete` here: it leaves the vhost
+            // pointing at a missing cert, so nginx -t fails and certbot can't run.)
+            $issuer = self::run(['bash', '-c', 'openssl x509 -in '.escapeshellarg("/etc/letsencrypt/live/{$domain}/cert.pem").' -noout -issuer 2>/dev/null'])->output();
+            if (stripos($issuer, 'STAGING') !== false || stripos($issuer, 'Fake') !== false) {
+                $cmd = array_values(array_diff($cmd, ['--keep-until-expiring']));
+                $cmd[] = '--force-renewal';
+            }
         }
 
         $r = self::run($cmd, 180);
         if (! $r->successful()) {
+            \App\Models\Site::where('domain', $domain)->update(['ssl_status' => 'failed']);
             throw new \RuntimeException('certbot failed: '.trim($r->errorOutput().' '.$r->output()));
         }
         self::run(['systemctl', 'reload', 'nginx']);
+        // Mark the site's SSL active — this is what was missing, leaving sites "pending" forever.
+        \App\Models\Site::where('domain', $domain)->update(['ssl_status' => $staging ? 'staging' : 'active']);
 
         return ['applied' => true, 'domain' => $domain, 'staging' => $staging];
     }
@@ -1012,7 +1024,7 @@ class AgentHandlers
                 'wordpress' => self::appWordpress($pub, $domain),
                 'phpmyadmin' => self::appPhpMyAdmin($pub),
                 'convoro' => self::appConvoro($dir, $domain),
-                'flarum' => self::appFlarum($dir, $domain),
+                'flarum' => self::appFlarum($dir, $domain, (string) ($args['version'] ?? '2')),
                 default => throw new \RuntimeException('Unknown app.'),
             };
             self::run(['chown', '-R', 'www-data:www-data', $dir]);
@@ -1154,15 +1166,17 @@ class AgentHandlers
         return "Convoro Forums installed · DB {$db}";
     }
 
-    private static function appFlarum(string $dir, string $domain): string
+    private static function appFlarum(string $dir, string $domain, string $version = '2'): string
     {
         [$db, $user, $pass] = self::createAppDb($domain);
         $tmp = '/tmp/fl-'.bin2hex(random_bytes(4));
         // create-project needs an empty target, so build in a temp dir then sync in.
-        // Install Flarum 2.x. Flarum 2.0 is still RC on Packagist, so pin ^2.0 +
-        // allow RC stability (composer would otherwise grab the latest *stable*,
-        // which is 1.x). Once 2.0 GA ships this keeps installing the newest 2.x.
-        $cp = self::run(['bash', '-c', 'COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer create-project "flarum/flarum:^2.0" '.escapeshellarg($tmp).' --stability=RC --no-interaction --no-dev 2>&1'], 900);
+        // The user picks the major version. Flarum 1.x is the latest *stable*;
+        // Flarum 2.0 is still RC on Packagist, so 2.x needs ^2.0 + --stability=RC
+        // (and keeps installing the newest 2.x once 2.0 GA ships).
+        $constraint = $version === '1' ? 'flarum/flarum:^1.0' : 'flarum/flarum:^2.0';
+        $stability = $version === '1' ? '' : ' --stability=RC';
+        $cp = self::run(['bash', '-c', 'COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer create-project "'.$constraint.'" '.escapeshellarg($tmp).$stability.' --no-interaction --no-dev 2>&1'], 900);
         if (! $cp->successful() || ! is_file("{$tmp}/flarum")) {
             self::run(['rm', '-rf', $tmp]);
             throw new \RuntimeException('Flarum download failed: '.trim(substr($cp->errorOutput().$cp->output(), -160)));
