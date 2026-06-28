@@ -19,6 +19,7 @@ use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SignupController;
+use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\TerminalController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TwoFactorController;
@@ -183,6 +184,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/services/install', [ServiceController::class, 'install'])->name('services.install');
 
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
+
+    Route::get('/monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
 
     Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
     Route::post('/billing/keys', [BillingController::class, 'saveKeys'])->name('billing.keys');

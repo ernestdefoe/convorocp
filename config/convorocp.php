@@ -50,6 +50,20 @@ return [
     ],
 
     /*
+     * Server monitoring. ConvoroCP embeds a self-hosted Beszel dashboard
+     * (historical CPU / memory / disk / network + per-container metrics + alerts).
+     * Run the Beszel hub on loopback and expose it on its own operator-gated TLS
+     * vhost (see deploy/beszel-setup.md). Leave `url` null to derive it as
+     * https://<panel-host>:<port>. The Monitoring screen stays in setup-hint mode
+     * until `enabled` is true.
+     */
+    'monitoring' => [
+        'enabled' => (bool) env('CONVOROCP_MONITORING_ENABLED', false),
+        'port' => env('CONVOROCP_MONITORING_PORT', 8443),
+        'url' => env('CONVOROCP_MONITORING_URL'),
+    ],
+
+    /*
      * Licensing. ConvoroCP is a paid product: a 30-day free trial, then a valid
      * license key (a $10/mo subscription, or a permanent key). A daily background
      * check validates the key against the Convoro store; `grace_days` keeps the

@@ -27,6 +27,7 @@ const navSets = {
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
         { key: 'backups', label: 'Backups', icon: 'ti-archive', href: '/backups' },
         { key: 'services', label: 'Services', icon: 'ti-server-cog', href: '/services' },
+        { key: 'monitoring', label: 'Monitoring', icon: 'ti-activity-heartbeat', href: '/monitoring' },
         { key: 'terminal', label: 'Terminal', icon: 'ti-terminal-2', href: '/terminal' },
         { key: 'security', label: 'Security', icon: 'ti-shield-lock', href: '/security' },
         { key: 'updates', label: 'Updates', icon: 'ti-refresh-alert', href: '/updates' },
@@ -59,6 +60,7 @@ const navSets = {
         { key: 'dns', label: 'DNS', icon: 'ti-route', href: '/dns' },
         { key: 'scheduler', label: 'Scheduler', icon: 'ti-calendar-clock', href: '/scheduler' },
         { key: 'daemons', label: 'Daemons', icon: 'ti-cpu', href: '/daemons' },
+        { key: 'monitoring', label: 'Monitoring', icon: 'ti-activity-heartbeat', href: '/monitoring' },
     ],
 };
 
