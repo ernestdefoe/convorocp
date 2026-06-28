@@ -37,6 +37,9 @@ function saveDocroot() { docrootForm.patch(`/sites/${props.site.id}/docroot`, { 
 const repo = useForm({ repo: props.site.repo || '', branch: props.site.branch || 'main', auto_deploy: !!props.site.auto_deploy });
 function saveRepo() { repo.patch(`/sites/${props.site.id}/repo`, { preserveScroll: true }); }
 function deployNow() { router.post(`/sites/${props.site.id}/deploy`, {}, { preserveScroll: true }); }
+
+const ssl = useForm({});
+function refreshSsl() { ssl.post(`/sites/${props.site.id}/ssl`, { preserveScroll: true }); }
 function destroy() {
     if (confirm(`Delete ${props.site.domain}? This cannot be undone.`)) {
         router.delete(`/sites/${props.site.id}`);
@@ -82,6 +85,7 @@ const field = 'box-sizing:border-box;background:var(--cp-card2);border:1px solid
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 9px"><span style="color: var(--cp-mut)">Status</span><span style="text-transform: capitalize">{{ site.status }}</span></div>
                 <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--cp-mut)">Auto-deploy</span><span>{{ site.auto_deploy ? 'On' : 'Off' }}</span></div>
+                <button type="button" @click="refreshSsl" :disabled="ssl.processing" style="margin-top: 12px; width: 100%; font-size: 12px; color: var(--cp-mut); background: var(--cp-soft); border: 1px solid var(--cp-ln); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px"><i class="ti ti-refresh" style="font-size: 14px" aria-hidden="true"></i>{{ ssl.processing ? 'Issuing…' : 'Refresh SSL' }}</button>
             </div>
         </div>
 

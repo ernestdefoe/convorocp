@@ -1159,7 +1159,10 @@ class AgentHandlers
         [$db, $user, $pass] = self::createAppDb($domain);
         $tmp = '/tmp/fl-'.bin2hex(random_bytes(4));
         // create-project needs an empty target, so build in a temp dir then sync in.
-        $cp = self::run(['bash', '-c', 'COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer create-project flarum/flarum '.escapeshellarg($tmp).' --no-interaction --no-dev 2>&1'], 900);
+        // Install Flarum 2.x. Flarum 2.0 is still RC on Packagist, so pin ^2.0 +
+        // allow RC stability (composer would otherwise grab the latest *stable*,
+        // which is 1.x). Once 2.0 GA ships this keeps installing the newest 2.x.
+        $cp = self::run(['bash', '-c', 'COMPOSER_ALLOW_SUPERUSER=1 php8.4 /usr/local/bin/composer create-project "flarum/flarum:^2.0" '.escapeshellarg($tmp).' --stability=RC --no-interaction --no-dev 2>&1'], 900);
         if (! $cp->successful() || ! is_file("{$tmp}/flarum")) {
             self::run(['rm', '-rf', $tmp]);
             throw new \RuntimeException('Flarum download failed: '.trim(substr($cp->errorOutput().$cp->output(), -160)));

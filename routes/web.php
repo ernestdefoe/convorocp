@@ -118,6 +118,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
     Route::post('/sites/adopt', [SiteController::class, 'adopt'])->name('sites.adopt');
     Route::get('/sites/{site}', [SiteController::class, 'show'])->name('sites.show');
+    Route::post('/sites/{site}/ssl', [SiteController::class, 'refreshSsl'])->name('sites.ssl');
     Route::patch('/sites/{site}/php', [SiteController::class, 'setPhp'])->name('sites.php');
     Route::patch('/sites/{site}/php-settings', [SiteController::class, 'setPhpSettings'])->name('sites.php-settings');
     Route::patch('/sites/{site}/docroot', [SiteController::class, 'setDocroot'])->name('sites.docroot');

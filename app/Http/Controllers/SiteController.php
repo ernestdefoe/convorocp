@@ -73,6 +73,20 @@ class SiteController extends Controller
         return redirect('/sites/'.$site->id);
     }
 
+    /**
+     * (Re-)issue a Let's Encrypt certificate for the site — for new sites whose
+     * DNS only resolved after creation, or whose first issuance failed. Safe to
+     * run repeatedly (certbot --keep-until-expiring).
+     */
+    public function refreshSsl(Request $request, Site $site)
+    {
+        $this->authorizeSite($request, $site);
+        $site->update(['ssl_status' => 'pending']);
+        Agent::dispatch('cert.issue', ['domain' => $site->domain]);
+
+        return back()->with('status', "Issuing SSL certificate for {$site->domain}…");
+    }
+
     public function show(Request $request, Site $site)
     {
         $this->authorizeSite($request, $site);
